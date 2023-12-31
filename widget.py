@@ -4,6 +4,7 @@ import os
 from PIL import Image
 import shutil
 import json 
+import pandas
 
 from stage_1 import Stage_1
 
@@ -27,7 +28,7 @@ class App(customtkinter.CTk):
                                                      dark_image=Image.open(os.path.join(image_path, "three_light.png")), size=(20, 20))
         icon_path = os.path.join(image_path, "cropped-Marigold-favicon-01.ico")
         
-        #Set up the initial window
+        #Set up the initial window.
         self.geometry("1100x800")
         self.title("City Submittal")
         self.iconbitmap(icon_path)
@@ -65,7 +66,7 @@ class App(customtkinter.CTk):
                                                                 command=self.change_appearance_mode_event)
         self.appearance_mode_menu.grid(row=6, column=0, padx=20, pady=20, sticky="s")
 
-        #Create home frame
+        #Create home frame.
         self.step_one = customtkinter.CTkFrame(self, corner_radius=0, fg_color="transparent")
         self.step_one.grid_columnconfigure(0, weight=1)
         self.step_one_Title = customtkinter.CTkLabel(self.step_one, text="City Submittal", font=customtkinter.CTkFont(size=30, weight="bold"))
@@ -82,29 +83,34 @@ class App(customtkinter.CTk):
         self.process_files_button = customtkinter.CTkButton(self.step_one, text="Process Files", command=self.process_files, state="disabled")
         self.process_files_button.grid(row=4, column=0, padx=20, pady=10)
 
-        #Reset Button
+        #Reset Button.
         self.reset_button = customtkinter.CTkButton(self.navigation_frame, text="Reset", command=self.reset_state)
         self.reset_button.grid(row=5, column=0, padx=20, pady=10)
 
-        # Override the window closing event
+        #Override the window closing event.
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
 
-        #Create second frame
+        #Create second frame.
         self.step_two = customtkinter.CTkFrame(self, corner_radius=0, fg_color="transparent")
 
-        #Create third frame
+        #Create third frame.
         self.step_three = customtkinter.CTkFrame(self, corner_radius=0, fg_color="transparent")
 
-        #Select default frame
+        #Select default frame.
         self.select_frame_by_name("Step One")
 
+        #initialize attributes to prevent errors on closing and reseting window.   
+        self.table_frame = None
+        self.filtered_rows = None
+
+
     def select_frame_by_name(self, name):
-        #Set button color for selected button
+        #Set button color for selected button.
         self.step_one_button.configure(fg_color=("gray75", "gray25") if name == "Step One" else "transparent")
         self.step_two_button.configure(fg_color=("gray75", "gray25") if name == "Step Two" else "transparent")
         self.step_three_button.configure(fg_color=("gray75", "gray25") if name == "Step Three" else "transparent")
 
-        #Show selected frame
+        #Show selected frame.
         if name == "Step One":
             self.step_one.grid(row=0, column=1, sticky="nsew")
         else:
@@ -172,7 +178,7 @@ class App(customtkinter.CTk):
         self.step_one.grid_rowconfigure(5, weight=1)  
         self.step_one.grid_columnconfigure(0, weight=1)
         
-        # Create a description for the table 
+        #Create a description for the table 
         self.table_description = customtkinter.CTkLabel(self.table_frame, text="The SQs displayed below have missing metadata. Please update in Aconex.",
                                                         font=customtkinter.CTkFont(size=15))
         self.table_description.grid(row=0, column=0, sticky='n')
@@ -182,31 +188,30 @@ class App(customtkinter.CTk):
         self.table = ttk.Treeview(self.table_frame, columns=simplified_columns, show='headings')
         self.table.grid(row=1, column=0, padx=20, pady=10, sticky='nsew')
 
-        # Define column headings and configure columns
+        #Define column headings and configure columns
         for col_name, simplified_col_name in zip(dataframe.columns, simplified_columns):
             self.table.heading(simplified_col_name, text=col_name)
             self.table.column(simplified_col_name, anchor="center")
 
-        # Insert data into the table
+        #Insert data into the table
         for _, row in dataframe.iterrows():
             values = [row[col] for col in dataframe.columns]
             self.table.insert("", "end", values=values)
 
-        # Create and place a vertical scrollbar
+        #Create and place a vertical scrollbar
         scrollbar = ttk.Scrollbar(self.table_frame, orient="vertical", command=self.table.yview)
         scrollbar.grid(row=1, column=1, sticky='ns')
         self.table.configure(yscrollcommand=scrollbar.set)
 
     def process_files(self):
-        filtered_rows = Stage_1.importdata()
+        self.filtered_rows = Stage_1.importdata()
 
-        # Clear existing table if it exists
+        #Clear existing table if it exists
         if hasattr(self, 'table'):
             self.table.destroy()
 
-        # Create a table and display the DataFrame
-        self.create_table(filtered_rows)
-
+        #Create a table and display the DataFrame
+        self.create_table(self.filtered_rows)
         messagebox.showinfo("Info", "Files processed successfully.")
 
     def load_state(self):
@@ -225,44 +230,65 @@ class App(customtkinter.CTk):
                     self.upload_button_sqmetadata.configure(state="disabled", text="Previous SQ Log Uploaded")
 
                 # If the table was displayed, recreate it (assuming you have the data available)
-                if state.get("table_displayed", False) and self.data_for_table_is_available():
-                    self.create_table(self.data_for_table)
+                if state.get("table_displayed", False):
+                    with open("save_data/table_data.json", "r") as data_file:
+                        table_data_json = data_file.read()
+                        table_data = pandas.read_json(table_data_json, orient='records', lines=True)
+                        self.create_table(table_data)
 
-        except FileNotFoundError:
-            # Reset to default state if the state file is not found
-            self.select_frame_by_name("Step One")
-            self.upload_button_exportdocs.configure(state="normal", text="Upload The Export Document - ExportDocs_Stage_1.xls")
-            self.upload_button_sqmetadata.configure(state="normal", text="Upload The Previous SQ Log - VLW-LOG-11000050-DC-0001_SQ_old.xls")
-            self.process_files_button.configure(state="disabled")
-            # Any other UI elements that need to be reset should be handled here
+        except FileNotFoundError as e:
+            if str(e).find('table_data.json') != -1:
+                print("table_data.json not found. A new table will need to be created.")
+            else:
+                # Reset to default state if the state file is not found
+                self.select_frame_by_name("Step One")
+                self.upload_button_exportdocs.configure(state="normal", text="Upload The Export Document - ExportDocs_Stage_1.xls")
+                self.upload_button_sqmetadata.configure(state="normal", text="Upload The Previous SQ Log - VLW-LOG-11000050-DC-0001_SQ_old.xls")
+                self.process_files_button.configure(state="disabled")
+                # Any other UI elements that need to be reset should be handled here
+
+        except Exception as e:
+            print("An error occurred:", e)
 
     def save_state(self, step_name):
-        # Make sure this method accepts a 'step_name' argument and uses it
+        # Ensure that the 'table' attribute exists and is a widget before checking if it is mapped
+        table_displayed = hasattr(self, 'table') and isinstance(self.table, ttk.Treeview) and self.table.winfo_ismapped()
         state = {
             "current_step": step_name,
             "exportdocs_uploaded": self.upload_button_exportdocs.cget("state") == "disabled",
             "sqmetadata_uploaded": self.upload_button_sqmetadata.cget("state") == "disabled",
-            "table_displayed": hasattr(self, 'table') and self.table.winfo_ismapped()
-        }
-        with open("save_data/app_state.json", "w") as file:  
+            "table_displayed": table_displayed }
+        
+        with open("save_data/app_state.json", "w") as file:
             json.dump(state, file)
 
+    def save_table_data(self, dataframe):
+        table_data = dataframe.to_json(orient='records', lines=True)
+        with open("save_data/table_data.json", "w") as file:
+            file.write(table_data)
+
     def reset_state(self):
-        # Delete the state file if it exists
+        #Delete the state file if it exists
         state_file = "save_data/app_state.json"
+        table_file = "save_data/table_data.json"
         if os.path.exists(state_file):
             os.remove(state_file)
+        if os.path.exists(table_file):
+            os.remove(table_file)
         
-        # Reset UI elements to default
+        #Reset UI elements to default
         self.upload_button_exportdocs.configure(state="normal", text="Upload The Export Document - ExportDocs_Stage_1.xls")
         self.upload_button_sqmetadata.configure(state="normal", text="Upload The Previous SQ Log - VLW-LOG-11000050-DC-0001_SQ_old.xls")
         self.process_files_button.configure(state="disabled")
 
-        # Call load_state to reset the UI
+        #Delete the table
+        self.table_frame.destroy()
+
+        #Call load_state to reset the UI
         self.load_state()
 
     def on_closing(self):
-        # Determine the current step and pass it to save_state before closing
+        #Determine the current step and pass it to save_state before closing
         current_step = "Step One"  # default value
         if self.step_one.winfo_ismapped():
             current_step = "Step One"
@@ -271,19 +297,24 @@ class App(customtkinter.CTk):
         elif self.step_three.winfo_ismapped():
             current_step = "Step Three"
 
+        # Save state before attempting to save table data
         self.save_state(current_step)
+        
+        # Only attempt to save table data if the table exists and is a widget
+        if hasattr(self, 'filtered_rows') and self.filtered_rows is not None and hasattr(self, 'table') and isinstance(self.table, ttk.Treeview):
+            self.save_table_data(self.filtered_rows)
+        
         self.destroy()
 
-    # Outside of your App class, make sure to create the directory if it doesn't exist
+    #Outside of your App class, make sure to create the directory if it doesn't exist
     if not os.path.exists("save_data"):  
         os.makedirs("save_data")
 
     def data_for_table_is_available(self):
-        # You need to specify the file path you want to check
-        return os.path.exists("path/to/your/datafile")
+        return os.path.exists("save_data/table_data.json")
 
 if __name__ == "__main__":
-    # Ensure the save_data directory exists
+    #Ensure the save_data directory exists
     if not os.path.exists("save_data"):  
         os.makedirs("save_data")
 
