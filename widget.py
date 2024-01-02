@@ -136,17 +136,19 @@ class App(customtkinter.CTk):
 
     def change_appearance_mode_event(self, new_appearance_mode):
         customtkinter.set_appearance_mode(new_appearance_mode)
+        with open("save_data/appearance_mode.txt","w") as file:
+            file.write(new_appearance_mode)
 
     def upload_exportdocs(self):
         filepath = filedialog.askopenfilename(filetypes=[("Excel files", "*.xls")])
         if filepath:
             if os.path.basename(filepath) == "ExportDocs_Stage_1.xls":
-                # Correct file selected, move it to the stage_one_documents folder
+                #Correct file selected, move it to the stage_one_documents folder
                 destination_folder = os.path.join(os.path.dirname(os.path.realpath(__file__)), "stage_one_documents")
                 shutil.move(filepath, os.path.join(destination_folder, "ExportDocs_Stage_1.xls"))
                 self.upload_button_exportdocs.configure(state="disabled", text="Export Document Uploaded")
             else:
-                # Incorrect file name, show an error message
+                #Incorrect file name, show an error message
                 messagebox.showerror("Error", "Please select a file named 'ExportDocs_Stage_1.xlsx'.")
         self.check_both_files_uploaded()
 
@@ -154,12 +156,12 @@ class App(customtkinter.CTk):
         filepath = filedialog.askopenfilename(filetypes=[("Excel files", "*.xls")])
         if filepath:
             if os.path.basename(filepath) == "VLW-LOG-11000050-DC-0001_SQ_old.xls":
-                # Correct file selected, move it to the stage_one_documents folder
+                #Correct file selected, move it to the stage_one_documents folder
                 destination_folder = os.path.join(os.path.dirname(os.path.realpath(__file__)), "stage_one_documents")
                 shutil.move(filepath, os.path.join(destination_folder, "VLW-LOG-11000050-DC-0001_SQ_old.xls"))
                 self.upload_button_sqmetadata.configure(state="disabled", text="Previous SQ Log Uploaded")
             else:
-                # Incorrect file name, show an error message
+                #Incorrect file name, show an error message
                 messagebox.showerror("Error", "Please select a file named 'VLW-LOG-11000050-DC-0001_SQ_old.xls'.")
         self.check_both_files_uploaded()
 
@@ -170,9 +172,9 @@ class App(customtkinter.CTk):
             self.process_files_button.configure(state="normal")
 
     def create_table(self, dataframe):
-        # Create a frame for table and description
+        #Create a frame for table and description
         self.table_frame = customtkinter.CTkFrame(self.step_one, corner_radius=0)
-        self.table_frame.grid(row=5, column=0, padx=20, pady=10, sticky='nsew')
+        self.table_frame.grid(row=5, column=0, padx=20, pady=10, sticky='new')
         self.table_frame.grid_rowconfigure(1, weight=1) 
         self.table_frame.grid_columnconfigure(0, weight=1)
         self.step_one.grid_rowconfigure(5, weight=1)  
@@ -183,7 +185,7 @@ class App(customtkinter.CTk):
                                                         font=customtkinter.CTkFont(size=15))
         self.table_description.grid(row=0, column=0, sticky='n')
 
-        # Simplify column names and create the Treeview widget
+        #Simplify column names and create the Treeview widget
         simplified_columns = [col.replace('?', '').replace('(', '').replace(')', '').replace('/', '_').replace(' ', '_') for col in dataframe.columns]
         self.table = ttk.Treeview(self.table_frame, columns=simplified_columns, show='headings')
         self.table.grid(row=1, column=0, padx=20, pady=10, sticky='nsew')
@@ -204,7 +206,7 @@ class App(customtkinter.CTk):
         self.table.configure(yscrollcommand=scrollbar.set)
 
     def process_files(self):
-        self.filtered_rows = Stage_1.importdata()
+        self.filtered_rows = Stage_1().SQs_missing_data()
 
         #Clear existing table if it exists
         if hasattr(self, 'table'):
@@ -212,7 +214,6 @@ class App(customtkinter.CTk):
 
         #Create a table and display the DataFrame
         self.create_table(self.filtered_rows)
-        messagebox.showinfo("Info", "Files processed successfully.")
 
     def load_state(self):
         try:
@@ -222,14 +223,14 @@ class App(customtkinter.CTk):
                 # Restore step
                 self.select_frame_by_name(state.get("current_step", "Step One"))
 
-                # Restore uploaded file states
+                #Restore uploaded file states
                 if state.get("exportdocs_uploaded", False):
                     self.upload_button_exportdocs.configure(state="disabled", text="Export Document Uploaded")
 
                 if state.get("sqmetadata_uploaded", False):
                     self.upload_button_sqmetadata.configure(state="disabled", text="Previous SQ Log Uploaded")
 
-                # If the table was displayed, recreate it (assuming you have the data available)
+                #If the table was displayed, recreate it (assuming you have the data available)
                 if state.get("table_displayed", False):
                     with open("save_data/table_data.json", "r") as data_file:
                         table_data_json = data_file.read()
@@ -250,14 +251,26 @@ class App(customtkinter.CTk):
         except Exception as e:
             print("An error occurred:", e)
 
+
+        try: 
+            with open("save_data/appearance_mode.txt", "r") as file:
+                mode = file.read().strip()
+                customtkinter.set_appearance_mode(mode)
+
+        except FileNotFoundError:
+            customtkinter.set_appearance_mode("Dark")
+
+        except Exception as e:
+            print("An error occurred:", e)
+
     def save_state(self, step_name):
-        # Ensure that the 'table' attribute exists and is a widget before checking if it is mapped
-        table_displayed = hasattr(self, 'table') and isinstance(self.table, ttk.Treeview) and self.table.winfo_ismapped()
+        #Ensure that the 'table' attribute exists and is a widget before checking if it is mapped
+        table_displayed = hasattr(self, 'table') and isinstance(self.table, ttk.Treeview) and self.table.winfo_exists() and self.table.winfo_ismapped()
         state = {
             "current_step": step_name,
             "exportdocs_uploaded": self.upload_button_exportdocs.cget("state") == "disabled",
             "sqmetadata_uploaded": self.upload_button_sqmetadata.cget("state") == "disabled",
-            "table_displayed": table_displayed }
+            "table_displayed": table_displayed}
         
         with open("save_data/app_state.json", "w") as file:
             json.dump(state, file)
@@ -297,10 +310,10 @@ class App(customtkinter.CTk):
         elif self.step_three.winfo_ismapped():
             current_step = "Step Three"
 
-        # Save state before attempting to save table data
+        #Save state before attempting to save table data
         self.save_state(current_step)
         
-        # Only attempt to save table data if the table exists and is a widget
+        #Only attempt to save table data if the table exists and is a widget
         if hasattr(self, 'filtered_rows') and self.filtered_rows is not None and hasattr(self, 'table') and isinstance(self.table, ttk.Treeview):
             self.save_table_data(self.filtered_rows)
         
