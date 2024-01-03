@@ -87,9 +87,6 @@ class App(customtkinter.CTk):
         self.reset_button = customtkinter.CTkButton(self.navigation_frame, text="Reset", command=self.reset_state)
         self.reset_button.grid(row=5, column=0, padx=20, pady=10)
 
-        #Override the window closing event.
-        self.protocol("WM_DELETE_WINDOW", self.on_closing)
-
         #Create second frame.
         self.step_two = customtkinter.CTkFrame(self, corner_radius=0, fg_color="transparent")
 
@@ -101,8 +98,10 @@ class App(customtkinter.CTk):
 
         #initialize attributes to prevent errors on closing and reseting window.   
         self.table_frame = None
-        self.filtered_rows = None
+        self.missing_metadata_file = None
 
+        #Override the window closing event.
+        self.protocol("WM_DELETE_WINDOW", self.on_closing)
 
     def select_frame_by_name(self, name):
         #Set button color for selected button.
@@ -171,6 +170,16 @@ class App(customtkinter.CTk):
         else:
             self.process_files_button.configure(state="normal")
 
+    def process_files(self):
+        self.missing_metadata_file = Stage_1().SQs_missing_data()
+
+        #Clear existing table if it exists
+        if hasattr(self, 'table'):
+            self.table.destroy()
+
+        #Create a table and display the DataFrame
+        self.create_table(self.missing_metadata_file)
+
     def create_table(self, dataframe):
         #Create a frame for table and description
         self.table_frame = customtkinter.CTkFrame(self.step_one, corner_radius=0)
@@ -205,15 +214,28 @@ class App(customtkinter.CTk):
         scrollbar.grid(row=1, column=1, sticky='ns')
         self.table.configure(yscrollcommand=scrollbar.set)
 
-    def process_files(self):
-        self.filtered_rows = Stage_1().SQs_missing_data()
+        self.download_missing_metadata_file_button = customtkinter.CTkButton(self.table_frame, text="Download Missing Metadata Excel File", command=self.download_missing_metadata_file)
+        self.download_missing_metadata_file_button.grid(row=6, column=0, padx=20, pady=10)
 
-        #Clear existing table if it exists
-        if hasattr(self, 'table'):
-            self.table.destroy()
+    def download_missing_metadata_file(self):
+        try:
+            #Assuming the file is saved in the 'data' directory
+            source_file = 'data/missing_metadata_file.xlsx'
+            if os.path.exists(source_file):
+                # Ask the user where to save the file
+                filetypes = [('Excel File', '*.xlsx'), ('All Files', '*.*')]
+                dest_file = filedialog.asksaveasfilename(defaultextension=".xlsx", filetypes=filetypes, title="Save File As")
+                # If the user selects a location, copy the file
+                if dest_file:
+                    shutil.copy(source_file, dest_file)             
+                else:
+                    messagebox.showinfo("Download Cancelled", "Download operation was cancelled.")
+            else:
+                messagebox.showerror("Download Failed", "The source file does not exist.")
+        
+        except Exception as e:
+            messagebox.showerror("Error", f"An error occurred: {e}")
 
-        #Create a table and display the DataFrame
-        self.create_table(self.filtered_rows)
 
     def load_state(self):
         try:
@@ -256,9 +278,11 @@ class App(customtkinter.CTk):
             with open("save_data/appearance_mode.txt", "r") as file:
                 mode = file.read().strip()
                 customtkinter.set_appearance_mode(mode)
+                self.appearance_mode_menu.set(mode)
 
         except FileNotFoundError:
             customtkinter.set_appearance_mode("Dark")
+            self.appearance_mode_menu.set("Dark")
 
         except Exception as e:
             print("An error occurred:", e)
@@ -314,8 +338,8 @@ class App(customtkinter.CTk):
         self.save_state(current_step)
         
         #Only attempt to save table data if the table exists and is a widget
-        if hasattr(self, 'filtered_rows') and self.filtered_rows is not None and hasattr(self, 'table') and isinstance(self.table, ttk.Treeview):
-            self.save_table_data(self.filtered_rows)
+        if hasattr(self, 'missing_metadata_file') and self.missing_metadata_file is not None and hasattr(self, 'table') and isinstance(self.table, ttk.Treeview):
+            self.save_table_data(self.missing_metadata_file)
         
         self.destroy()
 
