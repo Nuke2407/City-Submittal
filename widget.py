@@ -29,7 +29,7 @@ class App(customtkinter.CTk):
         icon_path = os.path.join(image_path, "cropped-Marigold-favicon-01.ico")
         
         #Set up the initial window.
-        self.geometry("1100x800")
+        self.geometry("1100x1000")
         self.title("City Submittal")
         self.iconbitmap(icon_path)
 
@@ -97,7 +97,7 @@ class App(customtkinter.CTk):
         self.select_frame_by_name("Step One")
 
         #initialize attributes to prevent errors on closing and reseting window.   
-        self.table_frame = None
+        self.missing_data_table_frame = None
         self.missing_metadata_file = None
 
         #Override the window closing event.
@@ -171,32 +171,73 @@ class App(customtkinter.CTk):
             self.process_files_button.configure(state="normal")
 
     def process_files(self):
+
         self.missing_metadata_file = Stage_1().SQs_missing_data()
 
         #Clear existing table if it exists
         if hasattr(self, 'table'):
-            self.table.destroy()
+            self.missing_data_table.destroy()
 
         #Create a table and display the DataFrame
-        self.create_table(self.missing_metadata_file)
+        self.create_incorrect_data_table(self.missing_metadata_file)
+        self.create_missing_data_table(self.missing_metadata_file)
 
-    def create_table(self, dataframe):
+
+    def create_missing_data_table(self, dataframe):
         #Create a frame for table and description
-        self.table_frame = customtkinter.CTkFrame(self.step_one, corner_radius=0)
-        self.table_frame.grid(row=5, column=0, padx=20, pady=10, sticky='new')
-        self.table_frame.grid_rowconfigure(1, weight=1) 
-        self.table_frame.grid_columnconfigure(0, weight=1)
+        self.missing_data_table_frame = customtkinter.CTkFrame(self.step_one, corner_radius=0)
+        self.missing_data_table_frame.grid(row=6, column=0, padx=20, pady=10, sticky='new')
+        self.missing_data_table_frame.grid_rowconfigure(1, weight=1) 
+        self.missing_data_table_frame.grid_columnconfigure(0, weight=1)
         self.step_one.grid_rowconfigure(5, weight=1)  
         self.step_one.grid_columnconfigure(0, weight=1)
         
         #Create a description for the table 
-        self.table_description = customtkinter.CTkLabel(self.table_frame, text="The SQs displayed below have missing metadata. Please update in Aconex.",
+        self.missing_data_table_description = customtkinter.CTkLabel(self.missing_data_table_frame, text="The SQs displayed below have missing metadata. Please update in Aconex.",
+                                                        font=customtkinter.CTkFont(size=15))
+        self.missing_data_table_description.grid(row=0, column=0, sticky='n')
+
+        #Simplify column names and create the Treeview widget
+        simplified_columns = [col.replace('?', '').replace('(', '').replace(')', '').replace('/', '_').replace(' ', '_') for col in dataframe.columns]
+        self.missing_data_table = ttk.Treeview(self.missing_data_table_frame, columns=simplified_columns, show='headings')
+        self.missing_data_table.grid(row=1, column=0, padx=20, pady=10, sticky='nsew')
+
+        #Define column headings and configure columns
+        for col_name, simplified_col_name in zip(dataframe.columns, simplified_columns):
+            self.missing_data_table.heading(simplified_col_name, text=col_name)
+            self.missing_data_table.column(simplified_col_name, anchor="center")
+
+        #Insert data into the table
+        for _, row in dataframe.iterrows():
+            values = [row[col] for col in dataframe.columns]
+            self.missing_data_table.insert("", "end", values=values)
+
+        #Create and place a vertical scrollbar
+        scrollbar = ttk.Scrollbar(self.missing_data_table_frame, orient="vertical", command=self.missing_data_table.yview)
+        scrollbar.grid(row=1, column=1, sticky='ns')
+        self.missing_data_table.configure(yscrollcommand=scrollbar.set)
+
+        self.download_missing_metadata_file_button = customtkinter.CTkButton(self.missing_data_table_frame, text="Download Missing Metadata Excel File", command=self.download_missing_metadata_file)
+        self.download_missing_metadata_file_button.grid(row=6, column=0, padx=20, pady=10)
+
+
+    def create_incorrect_data_table(self, dataframe):
+        #Create a frame for table and description
+        self.incorrect_data_frame = customtkinter.CTkFrame(self.step_one, corner_radius=0)
+        self.incorrect_data_frame.grid(row=5, column=0, padx=20, pady=10, sticky='new')
+        self.incorrect_data_frame.grid_rowconfigure(1, weight=1) 
+        self.incorrect_data_frame.grid_columnconfigure(0, weight=1)
+        self.step_one.grid_rowconfigure(5, weight=1)  
+        self.step_one.grid_columnconfigure(0, weight=1)
+        
+        #Create a description for the table 
+        self.table_description = customtkinter.CTkLabel(self.incorrect_data_frame, text="The SQs displayed below have Incorrectly filled out metadata. Please update in Aconex.",
                                                         font=customtkinter.CTkFont(size=15))
         self.table_description.grid(row=0, column=0, sticky='n')
 
         #Simplify column names and create the Treeview widget
         simplified_columns = [col.replace('?', '').replace('(', '').replace(')', '').replace('/', '_').replace(' ', '_') for col in dataframe.columns]
-        self.table = ttk.Treeview(self.table_frame, columns=simplified_columns, show='headings')
+        self.table = ttk.Treeview(self.incorrect_data_frame, columns=simplified_columns, show='headings')
         self.table.grid(row=1, column=0, padx=20, pady=10, sticky='nsew')
 
         #Define column headings and configure columns
@@ -210,11 +251,11 @@ class App(customtkinter.CTk):
             self.table.insert("", "end", values=values)
 
         #Create and place a vertical scrollbar
-        scrollbar = ttk.Scrollbar(self.table_frame, orient="vertical", command=self.table.yview)
+        scrollbar = ttk.Scrollbar(self.incorrect_data_frame, orient="vertical", command=self.table.yview)
         scrollbar.grid(row=1, column=1, sticky='ns')
         self.table.configure(yscrollcommand=scrollbar.set)
 
-        self.download_missing_metadata_file_button = customtkinter.CTkButton(self.table_frame, text="Download Missing Metadata Excel File", command=self.download_missing_metadata_file)
+        self.download_missing_metadata_file_button = customtkinter.CTkButton(self.incorrect_data_frame, text="Download Missing Metadata Excel File", command=self.download_missing_metadata_file)
         self.download_missing_metadata_file_button.grid(row=6, column=0, padx=20, pady=10)
 
     def download_missing_metadata_file(self):
@@ -257,7 +298,7 @@ class App(customtkinter.CTk):
                     with open("save_data/table_data.json", "r") as data_file:
                         table_data_json = data_file.read()
                         table_data = pandas.read_json(table_data_json, orient='records', lines=True)
-                        self.create_table(table_data)
+                        self.create_missing_data_table(table_data)
 
         except FileNotFoundError as e:
             if str(e).find('table_data.json') != -1:
@@ -289,7 +330,7 @@ class App(customtkinter.CTk):
 
     def save_state(self, step_name):
         #Ensure that the 'table' attribute exists and is a widget before checking if it is mapped
-        table_displayed = hasattr(self, 'table') and isinstance(self.table, ttk.Treeview) and self.table.winfo_exists() and self.table.winfo_ismapped()
+        table_displayed = hasattr(self, 'table') and isinstance(self.missing_data_table, ttk.Treeview) and self.missing_data_table.winfo_exists() and self.missing_data_table.winfo_ismapped()
         state = {
             "current_step": step_name,
             "exportdocs_uploaded": self.upload_button_exportdocs.cget("state") == "disabled",
@@ -319,7 +360,7 @@ class App(customtkinter.CTk):
         self.process_files_button.configure(state="disabled")
 
         #Delete the table
-        self.table_frame.destroy()
+        self.missing_data_table_frame.destroy()
 
         #Call load_state to reset the UI
         self.load_state()
@@ -338,7 +379,7 @@ class App(customtkinter.CTk):
         self.save_state(current_step)
         
         #Only attempt to save table data if the table exists and is a widget
-        if hasattr(self, 'missing_metadata_file') and self.missing_metadata_file is not None and hasattr(self, 'table') and isinstance(self.table, ttk.Treeview):
+        if hasattr(self, 'missing_metadata_file') and self.missing_metadata_file is not None and hasattr(self, 'table') and isinstance(self.missing_data_table, ttk.Treeview):
             self.save_table_data(self.missing_metadata_file)
         
         self.destroy()
