@@ -3,17 +3,17 @@ from tkinter import filedialog, messagebox, ttk
 import os
 from PIL import Image
 import shutil
-import json 
-import pandas
 
 from stage_1 import Stage_1
+from tables import *
+from save_load_functionality import *
 
 class App(customtkinter.CTk):
     def __init__(self):
         super().__init__()
         
         self.init_ui()
-        self.load_state()
+        load_state(self)
 
     def init_ui(self):
         #Loads the images. 
@@ -67,41 +67,46 @@ class App(customtkinter.CTk):
         self.appearance_mode_menu.grid(row=6, column=0, padx=20, pady=20, sticky="s")
 
         #Create home frame.
-        self.step_one = customtkinter.CTkFrame(self, corner_radius=0, fg_color="transparent")
-        self.step_one.grid_columnconfigure(0, weight=1)
-        self.step_one_Title = customtkinter.CTkLabel(self.step_one, text="City Submittal", font=customtkinter.CTkFont(size=30, weight="bold"))
+        self.step_one_frame = customtkinter.CTkFrame(self, corner_radius=0, fg_color="transparent")
+        self.step_one_frame.grid_columnconfigure(0, weight=1)
+        self.step_one_Title = customtkinter.CTkLabel(self.step_one_frame, text="City Submittal", font=customtkinter.CTkFont(size=30, weight="bold"))
         self.step_one_Title.grid(row=0, column=0, padx=20, pady=(20, 10))
-        self.step_one_Instructions = customtkinter.CTkLabel(self.step_one, text="Re-label and upload the 'ExportDocs_Stage_1' and 'SQ_metadata_closed_template' files into the appropriate sections below.",
+        self.step_one_Instructions = customtkinter.CTkLabel(self.step_one_frame, text="Re-label and upload the 'ExportDocs_Stage_1' and 'SQ_metadata_closed_template' files into the appropriate sections below.",
                                                             font=customtkinter.CTkFont(size=15))
         self.step_one_Instructions.grid(row=1, column=0, padx=20, pady=(20, 10))
 
-        self.upload_button_exportdocs = customtkinter.CTkButton(self.step_one, text="Upload The Export Document - ExportDocs_Stage_1.xls", command=self.upload_exportdocs)
+        self.upload_button_exportdocs = customtkinter.CTkButton(self.step_one_frame, text="Upload The Export Document - ExportDocs_Stage_1.xls", command=self.upload_exportdocs)
         self.upload_button_exportdocs.grid(row=2, column=0, padx=20, pady=10)
-        self.upload_button_sqmetadata = customtkinter.CTkButton(self.step_one, text="Upload The Previous SQ Log - VLW-LOG-11000050-DC-0001_SQ_old.xls", command=self.upload_sqmetadata)
+        self.upload_button_sqmetadata = customtkinter.CTkButton(self.step_one_frame, text="Upload The Previous SQ Log - VLW-LOG-11000050-DC-0001_SQ_old.xls", command=self.upload_sqmetadata)
         self.upload_button_sqmetadata.grid(row=3, column=0, padx=20, pady=10)
 
-        self.process_files_button = customtkinter.CTkButton(self.step_one, text="Process Files", command=self.process_files, state="disabled")
+        self.process_files_button = customtkinter.CTkButton(self.step_one_frame, text="Process Files", command=self.process_files, state="disabled")
         self.process_files_button.grid(row=4, column=0, padx=20, pady=10)
 
         #Reset Button.
-        self.reset_button = customtkinter.CTkButton(self.navigation_frame, text="Reset", command=self.reset_state)
+        self.reset_button = customtkinter.CTkButton(self.navigation_frame, text="Reset", command=lambda: reset_state(self))
         self.reset_button.grid(row=5, column=0, padx=20, pady=10)
 
         #Create second frame.
-        self.step_two = customtkinter.CTkFrame(self, corner_radius=0, fg_color="transparent")
+        self.step_two_frame = customtkinter.CTkFrame(self, corner_radius=0, fg_color="transparent")
 
         #Create third frame.
-        self.step_three = customtkinter.CTkFrame(self, corner_radius=0, fg_color="transparent")
+        self.step_three_frame = customtkinter.CTkFrame(self, corner_radius=0, fg_color="transparent")
 
         #Select default frame.
         self.select_frame_by_name("Step One")
 
         #initialize attributes to prevent errors on closing and reseting window.   
         self.missing_data_table_frame = None
+        self.incorrect_data_frame = None
         self.missing_metadata_file = None
 
         #Override the window closing event.
-        self.protocol("WM_DELETE_WINDOW", self.on_closing)
+        self.protocol("WM_DELETE_WINDOW", lambda: on_closing(self))
+
+        #Create a save file if it does not exit. 
+        if not os.path.exists("save_data"):  
+            os.makedirs("save_data")
 
     def select_frame_by_name(self, name):
         #Set button color for selected button.
@@ -111,17 +116,17 @@ class App(customtkinter.CTk):
 
         #Show selected frame.
         if name == "Step One":
-            self.step_one.grid(row=0, column=1, sticky="nsew")
+            self.step_one_frame.grid(row=0, column=1, sticky="nsew")
         else:
-            self.step_one.grid_forget()
+            self.step_one_frame.grid_forget()
         if name == "Step Two":
-            self.step_two.grid(row=0, column=1, sticky="nsew")
+            self.step_two_frame.grid(row=0, column=1, sticky="nsew")
         else:
-            self.step_two.grid_forget()
+            self.step_two_frame.grid_forget()
         if name == "Step Three":
-            self.step_three.grid(row=0, column=1, sticky="nsew")
+            self.step_three_frame.grid(row=0, column=1, sticky="nsew")
         else:
-            self.step_three.grid_forget()
+            self.step_three_frame.grid_forget()
 
     #Functions responsible for changing the frame when a new frame is selected
     def step_one_button_event(self):
@@ -179,217 +184,8 @@ class App(customtkinter.CTk):
             self.missing_data_table.destroy()
 
         #Create a table and display the DataFrame
-        self.create_incorrect_data_table(self.missing_metadata_file)
-        self.create_missing_data_table(self.missing_metadata_file)
-
-
-    def create_missing_data_table(self, dataframe):
-        #Create a frame for table and description
-        self.missing_data_table_frame = customtkinter.CTkFrame(self.step_one, corner_radius=0)
-        self.missing_data_table_frame.grid(row=6, column=0, padx=20, pady=10, sticky='new')
-        self.missing_data_table_frame.grid_rowconfigure(1, weight=1) 
-        self.missing_data_table_frame.grid_columnconfigure(0, weight=1)
-        self.step_one.grid_rowconfigure(5, weight=1)  
-        self.step_one.grid_columnconfigure(0, weight=1)
-        
-        #Create a description for the table 
-        self.missing_data_table_description = customtkinter.CTkLabel(self.missing_data_table_frame, text="The SQs displayed below have missing metadata. Please update in Aconex.",
-                                                        font=customtkinter.CTkFont(size=15))
-        self.missing_data_table_description.grid(row=0, column=0, sticky='n')
-
-        #Simplify column names and create the Treeview widget
-        simplified_columns = [col.replace('?', '').replace('(', '').replace(')', '').replace('/', '_').replace(' ', '_') for col in dataframe.columns]
-        self.missing_data_table = ttk.Treeview(self.missing_data_table_frame, columns=simplified_columns, show='headings')
-        self.missing_data_table.grid(row=1, column=0, padx=20, pady=10, sticky='nsew')
-
-        #Define column headings and configure columns
-        for col_name, simplified_col_name in zip(dataframe.columns, simplified_columns):
-            self.missing_data_table.heading(simplified_col_name, text=col_name)
-            self.missing_data_table.column(simplified_col_name, anchor="center")
-
-        #Insert data into the table
-        for _, row in dataframe.iterrows():
-            values = [row[col] for col in dataframe.columns]
-            self.missing_data_table.insert("", "end", values=values)
-
-        #Create and place a vertical scrollbar
-        scrollbar = ttk.Scrollbar(self.missing_data_table_frame, orient="vertical", command=self.missing_data_table.yview)
-        scrollbar.grid(row=1, column=1, sticky='ns')
-        self.missing_data_table.configure(yscrollcommand=scrollbar.set)
-
-        self.download_missing_metadata_file_button = customtkinter.CTkButton(self.missing_data_table_frame, text="Download Missing Metadata Excel File", command=self.download_missing_metadata_file)
-        self.download_missing_metadata_file_button.grid(row=6, column=0, padx=20, pady=10)
-
-
-    def create_incorrect_data_table(self, dataframe):
-        #Create a frame for table and description
-        self.incorrect_data_frame = customtkinter.CTkFrame(self.step_one, corner_radius=0)
-        self.incorrect_data_frame.grid(row=5, column=0, padx=20, pady=10, sticky='new')
-        self.incorrect_data_frame.grid_rowconfigure(1, weight=1) 
-        self.incorrect_data_frame.grid_columnconfigure(0, weight=1)
-        self.step_one.grid_rowconfigure(5, weight=1)  
-        self.step_one.grid_columnconfigure(0, weight=1)
-        
-        #Create a description for the table 
-        self.table_description = customtkinter.CTkLabel(self.incorrect_data_frame, text="The SQs displayed below have Incorrectly filled out metadata. Please update in Aconex.",
-                                                        font=customtkinter.CTkFont(size=15))
-        self.table_description.grid(row=0, column=0, sticky='n')
-
-        #Simplify column names and create the Treeview widget
-        simplified_columns = [col.replace('?', '').replace('(', '').replace(')', '').replace('/', '_').replace(' ', '_') for col in dataframe.columns]
-        self.table = ttk.Treeview(self.incorrect_data_frame, columns=simplified_columns, show='headings')
-        self.table.grid(row=1, column=0, padx=20, pady=10, sticky='nsew')
-
-        #Define column headings and configure columns
-        for col_name, simplified_col_name in zip(dataframe.columns, simplified_columns):
-            self.table.heading(simplified_col_name, text=col_name)
-            self.table.column(simplified_col_name, anchor="center")
-
-        #Insert data into the table
-        for _, row in dataframe.iterrows():
-            values = [row[col] for col in dataframe.columns]
-            self.table.insert("", "end", values=values)
-
-        #Create and place a vertical scrollbar
-        scrollbar = ttk.Scrollbar(self.incorrect_data_frame, orient="vertical", command=self.table.yview)
-        scrollbar.grid(row=1, column=1, sticky='ns')
-        self.table.configure(yscrollcommand=scrollbar.set)
-
-        self.download_missing_metadata_file_button = customtkinter.CTkButton(self.incorrect_data_frame, text="Download Missing Metadata Excel File", command=self.download_missing_metadata_file)
-        self.download_missing_metadata_file_button.grid(row=6, column=0, padx=20, pady=10)
-
-    def download_missing_metadata_file(self):
-        try:
-            #Assuming the file is saved in the 'data' directory
-            source_file = 'data/missing_metadata_file.xlsx'
-            if os.path.exists(source_file):
-                # Ask the user where to save the file
-                filetypes = [('Excel File', '*.xlsx'), ('All Files', '*.*')]
-                dest_file = filedialog.asksaveasfilename(defaultextension=".xlsx", filetypes=filetypes, title="Save File As")
-                # If the user selects a location, copy the file
-                if dest_file:
-                    shutil.copy(source_file, dest_file)             
-                else:
-                    messagebox.showinfo("Download Cancelled", "Download operation was cancelled.")
-            else:
-                messagebox.showerror("Download Failed", "The source file does not exist.")
-        
-        except Exception as e:
-            messagebox.showerror("Error", f"An error occurred: {e}")
-
-
-    def load_state(self):
-        try:
-            with open("save_data/app_state.json", "r") as file:
-                state = json.load(file)
-
-                # Restore step
-                self.select_frame_by_name(state.get("current_step", "Step One"))
-
-                #Restore uploaded file states
-                if state.get("exportdocs_uploaded", False):
-                    self.upload_button_exportdocs.configure(state="disabled", text="Export Document Uploaded")
-
-                if state.get("sqmetadata_uploaded", False):
-                    self.upload_button_sqmetadata.configure(state="disabled", text="Previous SQ Log Uploaded")
-
-                #If the table was displayed, recreate it (assuming you have the data available)
-                if state.get("table_displayed", False):
-                    with open("save_data/table_data.json", "r") as data_file:
-                        table_data_json = data_file.read()
-                        table_data = pandas.read_json(table_data_json, orient='records', lines=True)
-                        self.create_missing_data_table(table_data)
-
-        except FileNotFoundError as e:
-            if str(e).find('table_data.json') != -1:
-                print("table_data.json not found. A new table will need to be created.")
-            else:
-                # Reset to default state if the state file is not found
-                self.select_frame_by_name("Step One")
-                self.upload_button_exportdocs.configure(state="normal", text="Upload The Export Document - ExportDocs_Stage_1.xls")
-                self.upload_button_sqmetadata.configure(state="normal", text="Upload The Previous SQ Log - VLW-LOG-11000050-DC-0001_SQ_old.xls")
-                self.process_files_button.configure(state="disabled")
-                # Any other UI elements that need to be reset should be handled here
-
-        except Exception as e:
-            print("An error occurred:", e)
-
-
-        try: 
-            with open("save_data/appearance_mode.txt", "r") as file:
-                mode = file.read().strip()
-                customtkinter.set_appearance_mode(mode)
-                self.appearance_mode_menu.set(mode)
-
-        except FileNotFoundError:
-            customtkinter.set_appearance_mode("Dark")
-            self.appearance_mode_menu.set("Dark")
-
-        except Exception as e:
-            print("An error occurred:", e)
-
-    def save_state(self, step_name):
-        #Ensure that the 'table' attribute exists and is a widget before checking if it is mapped
-        table_displayed = hasattr(self, 'table') and isinstance(self.missing_data_table, ttk.Treeview) and self.missing_data_table.winfo_exists() and self.missing_data_table.winfo_ismapped()
-        state = {
-            "current_step": step_name,
-            "exportdocs_uploaded": self.upload_button_exportdocs.cget("state") == "disabled",
-            "sqmetadata_uploaded": self.upload_button_sqmetadata.cget("state") == "disabled",
-            "table_displayed": table_displayed}
-        
-        with open("save_data/app_state.json", "w") as file:
-            json.dump(state, file)
-
-    def save_table_data(self, dataframe):
-        table_data = dataframe.to_json(orient='records', lines=True)
-        with open("save_data/table_data.json", "w") as file:
-            file.write(table_data)
-
-    def reset_state(self):
-        #Delete the state file if it exists
-        state_file = "save_data/app_state.json"
-        table_file = "save_data/table_data.json"
-        if os.path.exists(state_file):
-            os.remove(state_file)
-        if os.path.exists(table_file):
-            os.remove(table_file)
-        
-        #Reset UI elements to default
-        self.upload_button_exportdocs.configure(state="normal", text="Upload The Export Document - ExportDocs_Stage_1.xls")
-        self.upload_button_sqmetadata.configure(state="normal", text="Upload The Previous SQ Log - VLW-LOG-11000050-DC-0001_SQ_old.xls")
-        self.process_files_button.configure(state="disabled")
-
-        #Delete the table
-        self.missing_data_table_frame.destroy()
-
-        #Call load_state to reset the UI
-        self.load_state()
-
-    def on_closing(self):
-        #Determine the current step and pass it to save_state before closing
-        current_step = "Step One"  # default value
-        if self.step_one.winfo_ismapped():
-            current_step = "Step One"
-        elif self.step_two.winfo_ismapped():
-            current_step = "Step Two"
-        elif self.step_three.winfo_ismapped():
-            current_step = "Step Three"
-
-        #Save state before attempting to save table data
-        self.save_state(current_step)
-        
-        #Only attempt to save table data if the table exists and is a widget
-        if hasattr(self, 'missing_metadata_file') and self.missing_metadata_file is not None and hasattr(self, 'table') and isinstance(self.missing_data_table, ttk.Treeview):
-            self.save_table_data(self.missing_metadata_file)
-        
-        self.destroy()
-
-    #Outside of your App class, make sure to create the directory if it doesn't exist
-    if not os.path.exists("save_data"):  
-        os.makedirs("save_data")
-
-    def data_for_table_is_available(self):
-        return os.path.exists("save_data/table_data.json")
+        self.missing_data_table = create_missing_data_table(self, self.missing_metadata_file)
+        self.incorrect_data_table = create_incorrect_data_table(self, self.missing_metadata_file)
 
 if __name__ == "__main__":
     #Ensure the save_data directory exists
