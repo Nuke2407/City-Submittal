@@ -84,7 +84,7 @@ class App(customtkinter.CTk):
         self.process_files_button.grid(row=4, column=0, padx=20, pady=10)
 
         #Reset Button.
-        self.reset_button = customtkinter.CTkButton(self.navigation_frame, text="Reset", command=lambda: reset_state(self))
+        self.reset_button = customtkinter.CTkButton(self.navigation_frame, text="Reset", command=self.reset_state)
         self.reset_button.grid(row=5, column=0, padx=20, pady=10)
 
         #Create second frame.
@@ -97,12 +97,13 @@ class App(customtkinter.CTk):
         self.select_frame_by_name("Step One")
 
         #initialize attributes to prevent errors on closing and reseting window.   
+        self.missing_data_table = None
+        self.incorrect_data_table = None
         self.missing_data_table_frame = None
-        self.incorrect_data_frame = None
-        self.missing_metadata_file = None
+        self.incorrect_data_table_frame = None
 
         #Override the window closing event.
-        self.protocol("WM_DELETE_WINDOW", lambda: on_closing(self))
+        self.protocol("WM_DELETE_WINDOW",lambda: on_closing(self))
 
         #Create a save file if it does not exit. 
         if not os.path.exists("save_data"):  
@@ -143,6 +144,33 @@ class App(customtkinter.CTk):
         with open("save_data/appearance_mode.txt","w") as file:
             file.write(new_appearance_mode)
 
+    def reset_state(self):
+        #Delete the state file if it exists
+        state_file = "save_data/app_state.json"
+        table_file = "save_data/table_data.json"
+        if os.path.exists(state_file):
+            os.remove(state_file)
+        if os.path.exists(table_file):
+            os.remove(table_file)
+        
+        #Reset UI elements to default
+        self.upload_button_exportdocs.configure(state="normal", text="Upload The Export Document - ExportDocs_Stage_1.xls")
+        self.upload_button_sqmetadata.configure(state="normal", text="Upload The Previous SQ Log - VLW-LOG-11000050-DC-0001_SQ_old.xls")
+        self.process_files_button.configure(state="disabled")
+
+        #Delete the table
+        if self.missing_data_table_frame is not None: 
+            self.missing_data_table_frame.destroy()
+            self.missing_data_table_frame = None
+            self.missing_data_table = None
+        if self.incorrect_data_table_frame is not None: 
+            self.incorrect_data_table_frame.destroy()
+            self.incorrect_data_table_frame = None
+            self.incorrect_data = None
+
+        #Call load_state to reset the UI
+        load_state(self)
+
     def upload_exportdocs(self):
         filepath = filedialog.askopenfilename(filetypes=[("Excel files", "*.xls")])
         if filepath:
@@ -157,6 +185,7 @@ class App(customtkinter.CTk):
         self.check_both_files_uploaded()
 
     def upload_sqmetadata(self):
+        
         filepath = filedialog.askopenfilename(filetypes=[("Excel files", "*.xls")])
         if filepath:
             if os.path.basename(filepath) == "VLW-LOG-11000050-DC-0001_SQ_old.xls":
@@ -179,13 +208,17 @@ class App(customtkinter.CTk):
 
         self.missing_metadata_file = Stage_1().SQs_missing_data()
 
+        ###ADD IT HERE###
+
         #Clear existing table if it exists
-        if hasattr(self, 'table'):
+        if self.missing_data_table is not None:
             self.missing_data_table.destroy()
+        if self.incorrect_data_table is not None:
+            self.incorrect_data_table.destroy()
 
         #Create a table and display the DataFrame
-        self.missing_data_table = create_missing_data_table(self, self.missing_metadata_file)
-        self.incorrect_data_table = create_incorrect_data_table(self, self.missing_metadata_file)
+        create_missing_data_table(self, self.missing_metadata_file)
+        create_incorrect_data_table(self, self.missing_metadata_file)
 
 if __name__ == "__main__":
     #Ensure the save_data directory exists

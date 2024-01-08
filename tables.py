@@ -5,21 +5,21 @@ import shutil
 
 def create_incorrect_data_table(app, dataframe):
     #Create a frame for table and description
-    app.incorrect_data_frame = customtkinter.CTkFrame(app.step_one_frame, corner_radius=0)
-    app.incorrect_data_frame.grid(row=5, column=0, padx=20, pady=10, sticky='new')
-    app.incorrect_data_frame.grid_rowconfigure(1, weight=1) 
-    app.incorrect_data_frame.grid_columnconfigure(0, weight=1)
+    app.incorrect_data_table_frame = customtkinter.CTkFrame(app.step_one_frame, corner_radius=0)
+    app.incorrect_data_table_frame.grid(row=5, column=0, padx=20, pady=10, sticky='new')
+    app.incorrect_data_table_frame.grid_rowconfigure(1, weight=1) 
+    app.incorrect_data_table_frame.grid_columnconfigure(0, weight=1)
     app.step_one_frame.grid_rowconfigure(5, weight=1)  
     app.step_one_frame.grid_columnconfigure(0, weight=1)
     
     #Create a description for the table 
-    app.table_description = customtkinter.CTkLabel(app.incorrect_data_frame, text="The SQs displayed below have Incorrectly filled out metadata. Please update in Aconex.",
+    app.table_description = customtkinter.CTkLabel(app.incorrect_data_table_frame, text="The SQs displayed below have Incorrectly filled out metadata. Please update in Aconex.",
                                                     font=customtkinter.CTkFont(size=15))
     app.table_description.grid(row=0, column=0, sticky='n')
 
     #Simplify column names and create the Treeview widget
     simplified_columns = [col.replace('?', '').replace('(', '').replace(')', '').replace('/', '_').replace(' ', '_') for col in dataframe.columns]
-    app.incorrect_data_table = ttk.Treeview(app.incorrect_data_frame, columns=simplified_columns, show='headings')
+    app.incorrect_data_table = ttk.Treeview(app.incorrect_data_table_frame, columns=simplified_columns, show='headings')
     app.incorrect_data_table.grid(row=1, column=0, padx=20, pady=10, sticky='nsew')
 
     #Define column headings and configure columns
@@ -33,11 +33,11 @@ def create_incorrect_data_table(app, dataframe):
         app.incorrect_data_table.insert("", "end", values=values)
 
     #Create and place a vertical scrollbar
-    scrollbar = ttk.Scrollbar(app.incorrect_data_frame, orient="vertical", command=app.incorrect_data_table.yview)
+    scrollbar = ttk.Scrollbar(app.incorrect_data_table_frame, orient="vertical", command=app.incorrect_data_table.yview)
     scrollbar.grid(row=1, column=1, sticky='ns')
     app.incorrect_data_table.configure(yscrollcommand=scrollbar.set)
 
-    app.download_missing_metadata_file_button = customtkinter.CTkButton(app.incorrect_data_frame, text="Download Missing Metadata Excel File", command=download_incorrect_data_table)
+    app.download_missing_metadata_file_button = customtkinter.CTkButton(app.incorrect_data_table_frame, text="Download Missing Metadata Excel File", command=download_incorrect_data_table)
     app.download_missing_metadata_file_button.grid(row=6, column=0, padx=20, pady=10)
 
 def download_incorrect_data_table():

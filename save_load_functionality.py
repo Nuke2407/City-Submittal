@@ -57,27 +57,6 @@ def load_state(app):
     except Exception as e:
         print("An error occurred:", e)
 
-def reset_state(app):
-    #Delete the state file if it exists
-    state_file = "save_data/app_state.json"
-    table_file = "save_data/table_data.json"
-    if os.path.exists(state_file):
-        os.remove(state_file)
-    if os.path.exists(table_file):
-        os.remove(table_file)
-    
-    #Reset UI elements to default
-    app.upload_button_exportdocs.configure(state="normal", text="Upload The Export Document - ExportDocs_Stage_1.xls")
-    app.upload_button_sqmetadata.configure(state="normal", text="Upload The Previous SQ Log - VLW-LOG-11000050-DC-0001_SQ_old.xls")
-    app.process_files_button.configure(state="disabled")
-
-    #Delete the table
-    app.missing_data_table_frame = None
-    app.incorrect_data_frame = None
-
-    #Call load_state to reset the UI
-    load_state(app)
-
 def on_closing(app):
     #Determine the current step and pass it to save_state before closing
     current_step = "Step One"  # default value
@@ -94,9 +73,10 @@ def on_closing(app):
     #Prepare a dictionary to store dataframes
     table_to_save = {}
     #Only attempt to save tables data if the table exists and is a widget
-    if hasattr(app, 'missing_data_table') and isinstance(app.missing_data_table, ttk.Treeview) and app.missing_data_table.winfo_exists() and app.missing_data_table.winfo_ismapped():
+
+    if app.missing_data_table is not None and isinstance(app.missing_data_table, ttk.Treeview):
         table_to_save['missing_metadata_file'] = app.missing_metadata_file
-    if hasattr(app, 'incorrect_data_table') and isinstance(app.incorrect_data_table, ttk.Treeview) and app.incorrect_data_table.winfo_exists() and app.incorrect_data_table.winfo_ismapped():
+    if app.incorrect_data_table is not None and isinstance(app.incorrect_data_table, ttk.Treeview):
         table_to_save['incorrect_data_file'] = app.incorrect_data_file
     
     if table_to_save:
@@ -106,8 +86,8 @@ def on_closing(app):
 
 def save_state(app, step_name):
     #Ensure that the 'table' attribute exists and is a widget before checking if it is mapped
-    table_missing_metadata_displayed = hasattr(app, 'missing_metadata_file') and isinstance(app.missing_data_table, ttk.Treeview) and app.missing_data_table.winfo_exists() and app.missing_data_table.winfo_ismapped()
-    tabel_incorrect_data_file_displayed = hasattr(app, 'incorrect_data_file') and isinstance(app.incorrect_data_table, ttk.Treeview) and app.missing_data_table.winfo_exists() and app.missing_data_table.winfo_ismapped()
+    table_missing_metadata_displayed = app.missing_data_table is not None and isinstance(app.missing_data_table, ttk.Treeview) 
+    tabel_incorrect_data_file_displayed = app.incorrect_data_table is not None and isinstance(app.incorrect_data_table, ttk.Treeview)
 
     table_displayed = table_missing_metadata_displayed or tabel_incorrect_data_file_displayed
 
