@@ -55,16 +55,27 @@ class Stage_1():
         self.missing_metadata_file = self.SQ_metadata_closed_file[conditions.any(axis=1)]
         #Select only the specific columns for self.missing_metadata_file.
         self.missing_metadata_file = self.missing_metadata_file[['Document No', 'Title', 'Discipline', 'Category of Change', 'Design Directive', 'Class of Change']]
-        #Create a downloadable version of self.missing_metadata_file dataframe. 
-        self.missing_metadata_file.to_excel('self.missing_metadata_file.xlsx', index=False)
+
+        #Creates a new dataframe where the Design Package, Incorporated To, and Specifications are split up and converted into lists for better comparison.
+        self.incorrect_metadata_file = self.SQ_metadata_closed_file
+        pattern_packages = r'(VLW-PKG-.*?)(?=, VLW-PKG-|$)'
+        pattern_specs = r'(VLW-SPC-.*?)(?=, VLW-SPC-|$)'
+        self.incorrect_metadata_file['Design Package Split Up'] = self.incorrect_metadata_file['Design Package'].str.extractall(pattern_packages)[0].groupby(level=0).apply(list)
+        self.incorrect_metadata_file['Incorporated Design Package Split Up'] = self.incorrect_metadata_file['Incorporated To'].str.extractall(pattern_packages)[0].groupby(level=0).apply(list)
+        self.incorrect_metadata_file['Specs Split Up'] = self.incorrect_metadata_file['Specifications'].str.extractall(pattern_specs)[0].groupby(level=0).apply(list)
+
+        #Create a downloadable version of the dataframe that contains both the incorrect and missing metadata. 
+        with pd.ExcelWriter('data/missing_incorrect_metadata_file.xlsx') as writer:
+            self.missing_metadata_file.to_excel(writer, sheet_name='SQs With Missing Data', index=False)
+            self.incorrect_metadata_file.to_excel(writer, sheet_name='SQs With Incorrect Data', index=False)
         # Replace NaN values with an empty string.
         self.missing_metadata_file.fillna('', inplace=True)
-        self.edit_missing_metadata_file()
+        
         return self.missing_metadata_file
     
     def edit_missing_metadata_file(self): 
         # Create a Pandas Excel writer using XlsxWriter as the engine.
-        writer = pd.ExcelWriter('data/missing_metadata_file.xlsx', engine='xlsxwriter')
+        writer = pd.ExcelWriter('data/missing_incorrect_metadata_file.xlsx', engine='xlsxwriter')
         # Write the dataframe data to XlsxWriter
         self.missing_metadata_file.to_excel(writer, sheet_name='Sheet1', index=False)
 
