@@ -177,7 +177,7 @@ class App(customtkinter.CTk):
             if os.path.basename(filepath) == "ExportDocs_Stage_1.xls":
                 #Correct file selected, move it to the stage_one_documents folder
                 destination_folder = os.path.join(os.path.dirname(os.path.realpath(__file__)), "stage_one_documents")
-                shutil.move(filepath, os.path.join(destination_folder, "ExportDocs_Stage_1.xls"))
+                shutil.copy(filepath, os.path.join(destination_folder, "ExportDocs_Stage_1.xls"))
                 self.upload_button_exportdocs.configure(state="disabled", text="Export Document Uploaded")
             else:
                 #Incorrect file name, show an error message
@@ -191,7 +191,7 @@ class App(customtkinter.CTk):
             if os.path.basename(filepath) == "VLW-LOG-11000050-DC-0001_SQ_old.xls":
                 #Correct file selected, move it to the stage_one_documents folder
                 destination_folder = os.path.join(os.path.dirname(os.path.realpath(__file__)), "stage_one_documents")
-                shutil.move(filepath, os.path.join(destination_folder, "VLW-LOG-11000050-DC-0001_SQ_old.xls"))
+                shutil.copy(filepath, os.path.join(destination_folder, "VLW-LOG-11000050-DC-0001_SQ_old.xls"))
                 self.upload_button_sqmetadata.configure(state="disabled", text="Previous SQ Log Uploaded")
             else:
                 #Incorrect file name, show an error message
@@ -206,7 +206,7 @@ class App(customtkinter.CTk):
 
     def process_files(self):
 
-        self.missing_metadata_file = Stage_1().SQs_missing_data()
+        Stage_1().SQs_missing_data()
 
         ###ADD IT HERE###
 
@@ -217,7 +217,7 @@ class App(customtkinter.CTk):
             self.incorrect_data_table.destroy()
 
         #Create a table and display the DataFrame
-        create_missing_data_table(self, self.missing_metadata_file)
+        create_missing_incorrect_data_table(self, self.missing_metadata_file)
         create_incorrect_data_table(self, self.missing_metadata_file)
 
 if __name__ == "__main__":

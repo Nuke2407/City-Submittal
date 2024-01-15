@@ -2,11 +2,54 @@ import customtkinter
 from tkinter import filedialog, messagebox, ttk
 import os
 import shutil
+import pandas as pd
+
+
+def create_missing_incorrect_data_table(app, excel_file_path):
+
+    #Create a frame for table and description
+    app.missing_data_table_frame = customtkinter.CTkFrame(app.step_one_frame, corner_radius=0)
+    app.missing_data_table_frame.grid(row=5, column=0, padx=20, pady=10, sticky='new')
+    app.missing_data_table_frame.grid_rowconfigure(1, weight=1) 
+    app.missing_data_table_frame.grid_columnconfigure(0, weight=1)
+    app.step_one_frame.grid_rowconfigure(5, weight=1)  
+    app.step_one_frame.grid_columnconfigure(0, weight=1)
+    
+    #Create a description for the table 
+    app.missing_data_table_description = customtkinter.CTkLabel(app.missing_data_table_frame, text="The SQs displayed below have missing metadata. Please update in Aconex.",
+                                                    font=customtkinter.CTkFont(size=15))
+    app.missing_data_table_description.grid(row=0, column=0, sticky='n')
+
+    #Simplify column names and create the Treeview widget
+    simplified_columns = [col.replace('?', '').replace('(', '').replace(')', '').replace('/', '_').replace(' ', '_') for col in dataframe.columns]
+    app.missing_data_table = ttk.Treeview(app.missing_data_table_frame, columns=simplified_columns, show='headings')
+    app.missing_data_table.grid(row=2, column=0, padx=20, pady=10, sticky='nsew')
+
+    #Define column headings and configure columns
+    for col_name, simplified_col_name in zip(dataframe.columns, simplified_columns):
+        app.missing_data_table.heading(simplified_col_name, text=col_name)
+        app.missing_data_table.column(simplified_col_name, anchor="center")
+
+    #Insert data into the table
+    for _, row in dataframe.iterrows():
+        values = [row[col] for col in dataframe.columns]
+        app.missing_data_table.insert("", "end", values=values)
+
+    #Create and place a vertical scrollbar
+    scrollbar = ttk.Scrollbar(app.missing_data_table_frame, orient="vertical", command=app.missing_data_table.yview)
+    scrollbar.grid(row=1, column=1, sticky='ns')
+    app.missing_data_table.configure(yscrollcommand=scrollbar.set)
+
+    app.download_missing_metadata_file_button = customtkinter.CTkButton(app.missing_data_table_frame, text="Download Missing Metadata Excel File", command=download_missing_metadata_file)
+    app.download_missing_metadata_file_button.grid(row=6, column=0, padx=20, pady=10)
+
+    if sheet_names:
+        update_table(sheet_names[0])
 
 def create_incorrect_data_table(app, dataframe):
     #Create a frame for table and description
     app.incorrect_data_table_frame = customtkinter.CTkFrame(app.step_one_frame, corner_radius=0)
-    app.incorrect_data_table_frame.grid(row=5, column=0, padx=20, pady=10, sticky='new')
+    app.incorrect_data_table_frame.grid(row=6, column=0, padx=20, pady=10, sticky='new')
     app.incorrect_data_table_frame.grid_rowconfigure(1, weight=1) 
     app.incorrect_data_table_frame.grid_columnconfigure(0, weight=1)
     app.step_one_frame.grid_rowconfigure(5, weight=1)  
@@ -58,43 +101,6 @@ def download_incorrect_data_table():
     
     except Exception as e:
         messagebox.showerror("Error", f"An error occurred: {e}")
-
-def create_missing_data_table(app, dataframe):
-    #Create a frame for table and description
-    app.missing_data_table_frame = customtkinter.CTkFrame(app.step_one_frame, corner_radius=0)
-    app.missing_data_table_frame.grid(row=6, column=0, padx=20, pady=10, sticky='new')
-    app.missing_data_table_frame.grid_rowconfigure(1, weight=1) 
-    app.missing_data_table_frame.grid_columnconfigure(0, weight=1)
-    app.step_one_frame.grid_rowconfigure(5, weight=1)  
-    app.step_one_frame.grid_columnconfigure(0, weight=1)
-    
-    #Create a description for the table 
-    app.missing_data_table_description = customtkinter.CTkLabel(app.missing_data_table_frame, text="The SQs displayed below have missing metadata. Please update in Aconex.",
-                                                    font=customtkinter.CTkFont(size=15))
-    app.missing_data_table_description.grid(row=0, column=0, sticky='n')
-
-    #Simplify column names and create the Treeview widget
-    simplified_columns = [col.replace('?', '').replace('(', '').replace(')', '').replace('/', '_').replace(' ', '_') for col in dataframe.columns]
-    app.missing_data_table = ttk.Treeview(app.missing_data_table_frame, columns=simplified_columns, show='headings')
-    app.missing_data_table.grid(row=1, column=0, padx=20, pady=10, sticky='nsew')
-
-    #Define column headings and configure columns
-    for col_name, simplified_col_name in zip(dataframe.columns, simplified_columns):
-        app.missing_data_table.heading(simplified_col_name, text=col_name)
-        app.missing_data_table.column(simplified_col_name, anchor="center")
-
-    #Insert data into the table
-    for _, row in dataframe.iterrows():
-        values = [row[col] for col in dataframe.columns]
-        app.missing_data_table.insert("", "end", values=values)
-
-    #Create and place a vertical scrollbar
-    scrollbar = ttk.Scrollbar(app.missing_data_table_frame, orient="vertical", command=app.missing_data_table.yview)
-    scrollbar.grid(row=1, column=1, sticky='ns')
-    app.missing_data_table.configure(yscrollcommand=scrollbar.set)
-
-    app.download_missing_metadata_file_button = customtkinter.CTkButton(app.missing_data_table_frame, text="Download Missing Metadata Excel File", command=download_missing_metadata_file)
-    app.download_missing_metadata_file_button.grid(row=6, column=0, padx=20, pady=10)
 
 def download_missing_metadata_file():
     try:
