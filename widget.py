@@ -217,8 +217,8 @@ class App(customtkinter.CTk):
             self.incorrect_data_table.destroy()
 
         #Create a table and display the DataFrame
-        create_missing_incorrect_data_table(self, self.missing_metadata_file)
-        create_incorrect_data_table(self, self.missing_metadata_file)
+        create_missing_incorrect_data_table(self, 'data/missing_incorrect_metadata_file.xlsx')
+        create_new_SQ_batch_table(self, 'data/new_city_sub_SQs.xlsx')
 
 if __name__ == "__main__":
     #Ensure the save_data directory exists

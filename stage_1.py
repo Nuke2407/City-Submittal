@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import xlsxwriter
 
 class Stage_1():
     def SQs_missing_data(self):
@@ -29,10 +30,13 @@ class Stage_1():
             self.missing_metadata_file.to_excel(writer, sheet_name='SQs With Missing Data', index=False)
             self.incorrect_metadata_file.to_excel(writer, sheet_name='SQs With Incorrect Data', index=False)
 
+        incorrect_missing_df_sheet_names = [(self.missing_metadata_file, 'SQs With Missing Data'), (self.incorrect_metadata_file, 'SQs With Incorrect Data')]
+
+        #Format the Excel file
+        self.format_and_save_excel(incorrect_missing_df_sheet_names, 'data/missing_incorrect_metadata_file.xlsx')
+
         # Replace NaN values with an empty string.
         self.missing_metadata_file.fillna('', inplace=True)
-        
-        #return self.missing_metadata_file
 
     def import_manupulate_data(self):
         "Imports all the metadata formatting it in order to output the documents missing data."
@@ -76,6 +80,21 @@ class Stage_1():
         #Apply the function to self.SQ_metadata_closed_file.
         self.SQ_metadata_closed_file['Rev. updated?(Y/N/NA)'] = self.SQ_metadata_closed_file.apply(check_SQ_Rev, axis=1)
         self.SQ_metadata_closed_file['If already sent to City?(Y/N)'] = self.SQ_metadata_closed_file['Document No'].apply(lambda x: 'Y' if x in vlw_doc_and_revisions else 'N')
+
+        #Filter the DataFrame to only include rows with 'N' in the 'If already sent to City?(Y/N)' column.
+        self.new_SQs_for_city_submittal = self.SQ_metadata_closed_file.loc[(self.SQ_metadata_closed_file['If already sent to City?(Y/N)'] == 'N') & (self.SQ_metadata_closed_file['Design Directive'] == 'FCD – Field Change Directive')]
+
+        #Filter the DataFrame to only include rows with 'Y' in the 'If already sent to City?(Y/N)' column and rows with 'Y' in the 'Rev. updated?(Y/N/NA)' column.
+        self.new_reved_up_SQs_for_city_submittal = self.SQ_metadata_closed_file.loc[(self.SQ_metadata_closed_file['If already sent to City?(Y/N)'] == 'Y') & (self.SQ_metadata_closed_file['Rev. updated?(Y/N/NA)'] == 'Y') & (self.SQ_metadata_closed_file['Design Directive'] == 'FCD – Field Change Directive')]
+
+        with pd.ExcelWriter('data/new_city_sub_SQs.xlsx') as writer:
+            self.new_SQs_for_city_submittal.to_excel(writer, sheet_name='New SQs not sent to the City', index=False)
+            self.new_reved_up_SQs_for_city_submittal.to_excel(writer, sheet_name='Reved up SQs', index=False)
+
+        new_SQs_for_city_submittal_df_with_sheet_names = [(self.new_SQs_for_city_submittal, 'New SQs not sent to the City'), (self.new_reved_up_SQs_for_city_submittal, 'Reved up SQs')]
+
+        #Format the Excel file
+        self.format_and_save_excel(new_SQs_for_city_submittal_df_with_sheet_names, 'data/new_city_sub_SQs.xlsx')
 
         #Creates an excel file without the index on the left side.
         self.SQ_metadata_closed_file.to_excel('data/SQ_metadata_closed_file.xlsx', index=False)
@@ -161,42 +180,46 @@ class Stage_1():
 
         return pd.DataFrame(incorrect_row)
     
-    def edit_missing_metadata_file(self): 
-        # Create a Pandas Excel writer using XlsxWriter as the engine.
-        writer = pd.ExcelWriter('data/missing_incorrect_metadata_file.xlsx', engine='xlsxwriter')
-        # Write the dataframe data to XlsxWriter
-        self.missing_metadata_file.to_excel(writer, sheet_name='Sheet1', index=False)
+    def format_and_save_excel(self, dataframes_with_sheet_names, file_path):
+        # Create a Pandas Excel writer using XlsxWriter as the engine
+        with pd.ExcelWriter(file_path, engine='xlsxwriter') as writer:
+            # Access the workbook and configure it
+            workbook = writer.book
+            workbook.nan_inf_to_errors = True
 
-         # Get the xlsxwriter workbook and worksheet objects
-        workbook  = writer.book
-        worksheet = writer.sheets['Sheet1']
+            # Define a format for the header
+            header_format = workbook.add_format({
+                'bold': True,
+                'text_wrap': True,
+                'valign': 'top',
+                'fg_color': '#0EC5D8',
+                'border': 1
+            })
 
-        # Define a format for the header
-        header_format = workbook.add_format({
-            'bold': True,
-            'text_wrap': True,
-            'valign': 'top',
-            'fg_color': '#0EC5D8',
-            'border': 1})
-        
-        # Define a format for the data cells with borders
-        cell_format = workbook.add_format({'border': 1})  # This line defines cell_format
-        
-        # Write the column headers with the defined format
-        for col_num, value in enumerate(self.missing_metadata_file.columns.values):
-            worksheet.write(0, col_num, value, header_format)
+            # Define a format for the data cells with borders
+            cell_format = workbook.add_format({'border': 1})
 
-        # Find the maximum length of the content in each column
-            column_len = self.missing_metadata_file[value].astype(str).map(len).max()
-            column_len = max(column_len, len(value))  # compare with column header length
-            worksheet.set_column(col_num, col_num, column_len)  # set column width
+            # Function to apply formatting to a worksheet
+            def format_worksheet(worksheet, dataframe):
+                # Write the column headers with the defined format
+                for col_num, value in enumerate(dataframe.columns.values):
+                    worksheet.write(0, col_num, value, header_format)
+                    # Set column width based on the maximum length of the content in each column
+                    column_len = max(dataframe[value].astype(str).map(len).max(), len(value))
+                    worksheet.set_column(col_num, col_num, column_len)
 
-         # Apply the cell format to each cell in the data
-        for row_num in range(1, len(self.missing_metadata_file) + 1):
-            for col_num in range(len(self.missing_metadata_file.columns)):
-                worksheet.write(row_num, col_num, self.missing_metadata_file.iloc[row_num - 1, col_num], cell_format)
+                # Apply the cell format to each cell in the data
+                for row_num in range(1, len(dataframe) + 1):
+                    for col_num in range(len(dataframe.columns)):
+                        cell_value = dataframe.iloc[row_num - 1, col_num]
+                        # Check for NaT values and replace with None
+                        if pd.isna(cell_value):
+                            cell_value = None
+                        worksheet.write(row_num, col_num, cell_value, cell_format)
 
-        # Close the Pandas Excel writer and output the Excel file
-        writer.close()
-
-    
+            # Write each DataFrame to its respective sheet and apply formatting
+            for dataframe, sheet_name in dataframes_with_sheet_names:
+                # Write the dataframe data to XlsxWriter
+                dataframe.to_excel(writer, sheet_name=sheet_name, index=False)
+                # Apply formatting to each worksheet
+                format_worksheet(writer.sheets[sheet_name], dataframe)
