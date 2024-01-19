@@ -1,6 +1,5 @@
 import pandas as pd
 import numpy as np
-import xlsxwriter
 
 class Stage_1():
     def SQs_missing_data(self):
@@ -82,8 +81,12 @@ class Stage_1():
         self.SQ_metadata_closed_file['If already sent to City?(Y/N)'] = self.SQ_metadata_closed_file['Document No'].apply(lambda x: 'Y' if x in vlw_doc_and_revisions else 'N')
 
         #Filter the DataFrame to only include rows with 'N' in the 'If already sent to City?(Y/N)' column.
-        self.new_SQs_for_city_submittal = self.SQ_metadata_closed_file.loc[(self.SQ_metadata_closed_file['If already sent to City?(Y/N)'] == 'N') & (self.SQ_metadata_closed_file['Design Directive'] == 'FCD – Field Change Directive')]
-
+        self.new_SQs_for_city_submittal = self.SQ_metadata_closed_file.loc[
+            (self.SQ_metadata_closed_file['If already sent to City?(Y/N)'] == 'N') & 
+            ((self.SQ_metadata_closed_file['Design Directive'] == 'FCD – Field Change Directive') | 
+            (self.SQ_metadata_closed_file['Design Directive'].isnull()) | 
+            (self.SQ_metadata_closed_file['Design Directive'] == ''))
+]
         #Filter the DataFrame to only include rows with 'Y' in the 'If already sent to City?(Y/N)' column and rows with 'Y' in the 'Rev. updated?(Y/N/NA)' column.
         self.new_reved_up_SQs_for_city_submittal = self.SQ_metadata_closed_file.loc[(self.SQ_metadata_closed_file['If already sent to City?(Y/N)'] == 'Y') & (self.SQ_metadata_closed_file['Rev. updated?(Y/N/NA)'] == 'Y') & (self.SQ_metadata_closed_file['Design Directive'] == 'FCD – Field Change Directive')]
 

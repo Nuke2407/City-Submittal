@@ -97,14 +97,14 @@ class App(customtkinter.CTk):
         self.select_frame_by_name("Step One")
 
         #initialize attributes to prevent errors on closing and reseting window.   
-        self.missing_data_table = None
-        self.incorrect_data_table = None
-        self.missing_data_table_frame = None
-        self.incorrect_data_table_frame = None
+        self.missing_incorrect_data_table = None
+        self.SQs_to_send_data_table = None
+        self.missing_incorrect_data_table_frame = None
+        self.SQs_to_send_data_table_frame = None
 
         #Override the window closing event.
         self.protocol("WM_DELETE_WINDOW",lambda: on_closing(self))
-
+        
         #Create a save file if it does not exit. 
         if not os.path.exists("save_data"):  
             os.makedirs("save_data")
@@ -159,17 +159,14 @@ class App(customtkinter.CTk):
         self.process_files_button.configure(state="disabled")
 
         #Delete the table
-        if self.missing_data_table_frame is not None: 
-            self.missing_data_table_frame.destroy()
-            self.missing_data_table_frame = None
-            self.missing_data_table = None
-        if self.incorrect_data_table_frame is not None: 
-            self.incorrect_data_table_frame.destroy()
-            self.incorrect_data_table_frame = None
-            self.incorrect_data = None
-
-        #Call load_state to reset the UI
-        load_state(self)
+        if self.missing_incorrect_data_table_frame is not None: 
+            self.missing_incorrect_data_table_frame.destroy()
+            self.missing_incorrect_data_table_frame = None
+            self.missing_incorrect_data_table = None
+        if self.SQs_to_send_data_table_frame is not None: 
+            self.SQs_to_send_data_table_frame.destroy()
+            self.SQs_to_send_data_table_frame = None
+            self.SQs_to_send_data_table = None
 
     def upload_exportdocs(self):
         filepath = filedialog.askopenfilename(filetypes=[("Excel files", "*.xls")])
@@ -211,10 +208,10 @@ class App(customtkinter.CTk):
         ###ADD IT HERE###
 
         #Clear existing table if it exists
-        if self.missing_data_table is not None:
-            self.missing_data_table.destroy()
-        if self.incorrect_data_table is not None:
-            self.incorrect_data_table.destroy()
+        if self.missing_incorrect_data_table is not None:
+            self.missing_incorrect_data_table.destroy()
+        if self.SQs_to_send_data_table is not None:
+            self.SQs_to_send_data_table.destroy()
 
         #Create a table and display the DataFrame
         create_missing_incorrect_data_table(self, 'data/missing_incorrect_metadata_file.xlsx')
