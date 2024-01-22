@@ -4,7 +4,7 @@ import os
 from PIL import Image
 import shutil
 
-from stage_1 import Stage_1
+from excel_manipulation import Excel_Manipulation
 from tables import *
 from save_load_functionality import *
 
@@ -29,7 +29,7 @@ class App(customtkinter.CTk):
         icon_path = os.path.join(image_path, "cropped-Marigold-favicon-01.ico")
         
         #Set up the initial window.
-        self.geometry("1100x1000")
+        self.geometry("1130x1000")
         self.title("City Submittal")
         self.iconbitmap(icon_path)
 
@@ -66,31 +66,41 @@ class App(customtkinter.CTk):
                                                                 command=self.change_appearance_mode_event)
         self.appearance_mode_menu.grid(row=6, column=0, padx=20, pady=20, sticky="s")
 
-        #Create home frame.
+        #Reset Button.
+        self.reset_button = customtkinter.CTkButton(self.navigation_frame, text="Reset", command=self.reset_state)
+        self.reset_button.grid(row=5, column=0, padx=20, pady=10)
+
+        #Create step 1 frame
         self.step_one_frame = customtkinter.CTkFrame(self, corner_radius=0, fg_color="transparent")
         self.step_one_frame.grid_columnconfigure(0, weight=1)
+
         self.step_one_Title = customtkinter.CTkLabel(self.step_one_frame, text="City Submittal", font=customtkinter.CTkFont(size=30, weight="bold"))
         self.step_one_Title.grid(row=0, column=0, padx=20, pady=(20, 10))
-        self.step_one_Instructions = customtkinter.CTkLabel(self.step_one_frame, text="Re-label and upload the 'ExportDocs_Stage_1' and 'SQ_metadata_closed_template' files into the appropriate sections below.",
-                                                            font=customtkinter.CTkFont(size=15))
-        self.step_one_Instructions.grid(row=1, column=0, padx=20, pady=(20, 10))
 
-        self.upload_button_exportdocs = customtkinter.CTkButton(self.step_one_frame, text="Upload The Export Document - ExportDocs_Stage_1.xls", command=self.upload_exportdocs)
-        self.upload_button_exportdocs.grid(row=2, column=0, padx=20, pady=10)
+        self.step_one_instructions = customtkinter.CTkLabel(self.step_one_frame, text="Re-label and upload the 'ExportDocs_Stage_1' and 'VLW-LOG-11000050-DC-0001_SQ_old' files into the appropriate sections below.",
+                                                            font=customtkinter.CTkFont(size=15))
+        self.step_one_instructions.grid(row=1, column=0, padx=20, pady=(20, 10))
+
+        self.upload_Stage_1_button_exportdocs = customtkinter.CTkButton(self.step_one_frame, text="Upload The Export Document - ExportDocs_Stage_1.xls", command=self.upload_exportdocs_step_1)
+        self.upload_Stage_1_button_exportdocs.grid(row=2, column=0, padx=20, pady=10)
+
         self.upload_button_sqmetadata = customtkinter.CTkButton(self.step_one_frame, text="Upload The Previous SQ Log - VLW-LOG-11000050-DC-0001_SQ_old.xls", command=self.upload_sqmetadata)
         self.upload_button_sqmetadata.grid(row=3, column=0, padx=20, pady=10)
 
         self.process_files_button = customtkinter.CTkButton(self.step_one_frame, text="Process Files", command=self.process_files, state="disabled")
         self.process_files_button.grid(row=4, column=0, padx=20, pady=10)
 
-        #Reset Button.
-        self.reset_button = customtkinter.CTkButton(self.navigation_frame, text="Reset", command=self.reset_state)
-        self.reset_button.grid(row=5, column=0, padx=20, pady=10)
-
-        #Create second frame.
+        #Create step 2 frame.
         self.step_two_frame = customtkinter.CTkFrame(self, corner_radius=0, fg_color="transparent")
+        self.step_two_frame.grid_columnconfigure(0, weight=1)
 
-        #Create third frame.
+        self.step_two_instructions = customtkinter.CTkLabel(self.step_two_frame, text="Re-label and upload the 'ExportDocs_Stage_2' export document with the complete and checked metadata.", font=customtkinter.CTkFont(size=15))
+        self.step_two_instructions.grid(row=0, column=0, padx=20, pady=(20,10))
+
+        self.upload_Stage_2_button_exportdocs = customtkinter.CTkButton(self.step_two_frame, text="Upload The Export Document - ExportDocs_Stage_2.xls", command=self.upload_exportdocs_step_2)
+        self.upload_Stage_2_button_exportdocs.grid(row=1, column=0, padx=20, pady=10)
+
+        #Create step 3 frame.
         self.step_three_frame = customtkinter.CTkFrame(self, corner_radius=0, fg_color="transparent")
 
         #Select default frame.
@@ -99,8 +109,12 @@ class App(customtkinter.CTk):
         #initialize attributes to prevent errors on closing and reseting window.   
         self.missing_incorrect_data_table = None
         self.SQs_to_send_data_table = None
+        self.missing_incorrect_data_table_stage_2 = None
+
         self.missing_incorrect_data_table_frame = None
         self.SQs_to_send_data_table_frame = None
+        self.missing_incorrect_data_table_stage_2_frame = None
+        
 
         #Override the window closing event.
         self.protocol("WM_DELETE_WINDOW",lambda: on_closing(self))
@@ -154,7 +168,7 @@ class App(customtkinter.CTk):
             os.remove(table_file)
         
         #Reset UI elements to default
-        self.upload_button_exportdocs.configure(state="normal", text="Upload The Export Document - ExportDocs_Stage_1.xls")
+        self.upload_Stage_1_button_exportdocs.configure(state="normal", text="Upload The Export Document - ExportDocs_Stage_1.xls")
         self.upload_button_sqmetadata.configure(state="normal", text="Upload The Previous SQ Log - VLW-LOG-11000050-DC-0001_SQ_old.xls")
         self.process_files_button.configure(state="disabled")
 
@@ -167,15 +181,20 @@ class App(customtkinter.CTk):
             self.SQs_to_send_data_table_frame.destroy()
             self.SQs_to_send_data_table_frame = None
             self.SQs_to_send_data_table = None
+        if self.missing_incorrect_data_table_stage_2_frame is not None: 
+            self.missing_incorrect_data_table_stage_2_frame.destroy()
+            self.missing_incorrect_data_table_stage_2_frame = None
+            self.missing_incorrect_data_table_stage_2 = None
 
-    def upload_exportdocs(self):
+    #STEP 1 MEATHODS
+    def upload_exportdocs_step_1(self):
         filepath = filedialog.askopenfilename(filetypes=[("Excel files", "*.xls")])
         if filepath:
             if os.path.basename(filepath) == "ExportDocs_Stage_1.xls":
                 #Correct file selected, move it to the stage_one_documents folder
                 destination_folder = os.path.join(os.path.dirname(os.path.realpath(__file__)), "stage_one_documents")
                 shutil.copy(filepath, os.path.join(destination_folder, "ExportDocs_Stage_1.xls"))
-                self.upload_button_exportdocs.configure(state="disabled", text="Export Document Uploaded")
+                self.upload_Stage_1_button_exportdocs.configure(state="disabled", text="Export Document Uploaded")
             else:
                 #Incorrect file name, show an error message
                 messagebox.showerror("Error", "Please select a file named 'ExportDocs_Stage_1.xlsx'.")
@@ -196,16 +215,13 @@ class App(customtkinter.CTk):
         self.check_both_files_uploaded()
 
     def check_both_files_uploaded(self):
-        if not self.upload_button_exportdocs.cget('state') == 'disabled' or not self.upload_button_sqmetadata.cget('state') == 'disabled':
+        if not self.upload_Stage_1_button_exportdocs.cget('state') == 'disabled' or not self.upload_button_sqmetadata.cget('state') == 'disabled':
             self.process_files_button.configure(state="disabled")
         else:
             self.process_files_button.configure(state="normal")
 
     def process_files(self):
-
-        Stage_1().SQs_missing_data()
-
-        ###ADD IT HERE###
+        Excel_Manipulation().stage_1()
 
         #Clear existing table if it exists
         if self.missing_incorrect_data_table is not None:
@@ -214,8 +230,27 @@ class App(customtkinter.CTk):
             self.SQs_to_send_data_table.destroy()
 
         #Create a table and display the DataFrame
-        create_missing_incorrect_data_table(self, 'data/missing_incorrect_metadata_file.xlsx')
+        create_missing_incorrect_data_table_stage_1(self, 'data/missing_incorrect_metadata_file.xlsx')
         create_new_SQ_batch_table(self, 'data/new_city_sub_SQs.xlsx')
+
+
+
+    #STEP 2 FUNCTIONS
+    def upload_exportdocs_step_2(self):
+        filepath = filedialog.askopenfilename(filetypes=[("Excel files", "*.xls")])
+        if filepath:
+            if os.path.basename(filepath) == "ExportDocs_Stage_2.xls":
+                #Correct file selected, move it to the stage_one_documents folder
+                destination_folder = os.path.join(os.path.dirname(os.path.realpath(__file__)), "stage_one_documents")
+                shutil.copy(filepath, os.path.join(destination_folder, "ExportDocs_Stage_2.xls"))
+                self.upload_Stage_2_button_exportdocs.configure(state="disabled", text="Export Document Uploaded")
+                Excel_Manipulation().stage_2()
+                create_missing_incorrect_data_table_stage_2(self, 'data/missing_incorrect_metadata_file_2.xlsx')
+
+            else:
+                #Incorrect file name, show an error message
+                messagebox.showerror("Error", "Please select a file named 'ExportDocs_Stage_2.xlsx'.")
+
 
 if __name__ == "__main__":
     #Ensure the save_data directory exists

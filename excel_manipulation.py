@@ -1,55 +1,37 @@
 import pandas as pd
 import numpy as np
 
-class Stage_1():
-    def SQs_missing_data(self):
+class Excel_Manipulation():
+    def stage_1(self):
         self.import_manupulate_data()
-        #Create conditions for filtering rows.
-        conditions = self.SQ_metadata_closed_file[['Design Directive', 'Category of Change', 'Class of Change']].replace('', np.nan).isna()
-        self.missing_metadata_file = self.SQ_metadata_closed_file[conditions.any(axis=1)]
-        #Select only the specific columns for self.missing_metadata_file.
-        self.missing_metadata_file = self.missing_metadata_file[['Document No', 'Title', 'Discipline', 'Category of Change', 'Design Directive', 'Class of Change']]
 
-        #Creates a new dataframe where the Design Package, Incorporated To, and Specifications are split up and converted into lists for better comparison.
-        self.incorrect_metadata_file = self.SQ_metadata_closed_file
-        pattern_packages = r'(VLW-PKG-.*?)(?=, VLW-PKG-|$)'
-        pattern_specs = r'(VLW-SPC-.*?)(?=, VLW-SPC-|$)'
-        pattern_combined = r'(VLW-(?:PKG|SPC)-.*?)(?=, VLW-(?:PKG|SPC)-|$)'
-        self.incorrect_metadata_file['Design Package Split Up'] = self.incorrect_metadata_file['Design Package'].str.extractall(pattern_packages)[0].groupby(level=0).apply(list)
-        self.incorrect_metadata_file['Specs Split Up'] = self.incorrect_metadata_file['Specifications'].str.extractall(pattern_specs)[0].groupby(level=0).apply(list)
-        self.incorrect_metadata_file['Incorporated Design Package Split Up'] = self.incorrect_metadata_file['Incorporated To'].str.extractall(pattern_combined)[0].groupby(level=0).apply(list)
-
-
-        self.incorrect_metadata_file = Stage_1.incorrect_metadata_check(self.incorrect_metadata_file)
-        self.incorrect_metadata_file = self.incorrect_metadata_file[['Document No', 'Title', 'Design Directive', 'Class of Change', 'Category of Change', 
-                                                                     'Reason for Change', 'Design Package', 'Specifications', 'Incorporated To', 'Error Type']]
+        self.missing_metadata_file_1 = Excel_Manipulation.missing_metadata_check(self.SQ_metadata_closed_file)
+        self.incorrect_metadata_file_stage_1 = Excel_Manipulation.incorrect_metadata_check(self.SQ_metadata_closed_file)
 
         #Create a downloadable version of the dataframe that contains both the incorrect and missing metadata. 
         with pd.ExcelWriter('data/missing_incorrect_metadata_file.xlsx') as writer:
-            self.missing_metadata_file.to_excel(writer, sheet_name='SQs With Missing Data', index=False)
-            self.incorrect_metadata_file.to_excel(writer, sheet_name='SQs With Incorrect Data', index=False)
+            self.missing_metadata_file_1.to_excel(writer, sheet_name='SQs With Missing Data', index=False)
+            self.incorrect_metadata_file_stage_1.to_excel(writer, sheet_name='SQs With Incorrect Data', index=False)
 
-        incorrect_missing_df_sheet_names = [(self.missing_metadata_file, 'SQs With Missing Data'), (self.incorrect_metadata_file, 'SQs With Incorrect Data')]
+        incorrect_missing_df_sheet_names = [(self.missing_metadata_file_1, 'SQs With Missing Data'), (self.incorrect_metadata_file_stage_1, 'SQs With Incorrect Data')]
 
         #Format the Excel file
         self.format_and_save_excel(incorrect_missing_df_sheet_names, 'data/missing_incorrect_metadata_file.xlsx')
 
-        # Replace NaN values with an empty string.
-        self.missing_metadata_file.fillna('', inplace=True)
-
     def import_manupulate_data(self):
-        "Imports all the metadata formatting it in order to output the documents missing data."
         excel_file_1 = 'stage_one_documents/SQ_metadata_closed_template.xlsx'
-        excel_file_2 = 'stage_one_documents/ExportDocs_Stage_1.xls'
-        excel_file_3 = 'stage_one_documents/VLW-LOG-11000050-DC-0001_SQ_old.xls'
+        excel_file_2 = 'stage_one_documents/VLW-LOG-11000050-DC-0001_SQ_old.xls'
+        excel_file_3 = 'stage_one_documents/ExportDocs_Stage_1.xls'
 
         #Reads the excel file and stores the datat in Dataframes. The 'header=' sets the header to the 12th excel column.
         self.SQ_metadata_closed_file = pd.read_excel(excel_file_1, header=0)
-        ExportDocs = pd.read_excel(excel_file_2, header=10)
-        VLW_LOG_11000050_DC_0001_SQ_old = pd.read_excel(excel_file_3)
+        VLW_LOG_11000050_DC_0001_SQ_old = pd.read_excel(excel_file_2)
 
-        #Copying data from ExportDocs to self.SQ_metadata_closed_file.
-        data_to_check = ExportDocs.loc[0:, 'Document No':'Date Reviewed']
+        temp_df = pd.read_excel(excel_file_3, header=None)
+        exportDocs_1 = Excel_Manipulation.find_header(temp_df, excel_file_3)
+
+        #Copying data from exportDocs to self.SQ_metadata_closed_file.
+        data_to_check = exportDocs_1.loc[0:, 'Document No':'Date Reviewed']
  
         #Check to see how many rows have to be added.
         required_rows = len(data_to_check)
@@ -83,10 +65,12 @@ class Stage_1():
         #Filter the DataFrame to only include rows with 'N' in the 'If already sent to City?(Y/N)' column.
         self.new_SQs_for_city_submittal = self.SQ_metadata_closed_file.loc[
             (self.SQ_metadata_closed_file['If already sent to City?(Y/N)'] == 'N') & 
-            ((self.SQ_metadata_closed_file['Design Directive'] == 'FCD – Field Change Directive') | 
-            (self.SQ_metadata_closed_file['Design Directive'].isnull()) | 
-            (self.SQ_metadata_closed_file['Design Directive'] == ''))
-]
+            (((self.SQ_metadata_closed_file['Design Directive'] == 'FCD – Field Change Directive') | 
+            (self.SQ_metadata_closed_file['Design Directive'].isnull())) | 
+            ((self.SQ_metadata_closed_file['Design Directive'] == 'RFI – No Design Change') & 
+            ((self.SQ_metadata_closed_file['Category of Change'].isnull()) | 
+            (self.SQ_metadata_closed_file['Class of Change'].isnull()))))]
+            
         #Filter the DataFrame to only include rows with 'Y' in the 'If already sent to City?(Y/N)' column and rows with 'Y' in the 'Rev. updated?(Y/N/NA)' column.
         self.new_reved_up_SQs_for_city_submittal = self.SQ_metadata_closed_file.loc[(self.SQ_metadata_closed_file['If already sent to City?(Y/N)'] == 'Y') & (self.SQ_metadata_closed_file['Rev. updated?(Y/N/NA)'] == 'Y') & (self.SQ_metadata_closed_file['Design Directive'] == 'FCD – Field Change Directive')]
 
@@ -102,7 +86,25 @@ class Stage_1():
         #Creates an excel file without the index on the left side.
         self.SQ_metadata_closed_file.to_excel('data/SQ_metadata_closed_file.xlsx', index=False)
     
-    def incorrect_metadata_check(incorrect_metadata_file):
+    def missing_metadata_check(df_file):
+        #Create conditions for filtering rows.
+        conditions = df_file[['Design Directive', 'Category of Change', 'Class of Change']].replace('', np.nan).isna()
+        df_file = df_file[conditions.any(axis=1)]
+        #Select only the specific columns for self.missing_metadata_file.
+        df_file = df_file[['Document No', 'Title', 'Discipline', 'Category of Change', 'Design Directive', 'Class of Change']]
+
+        return df_file
+
+    def incorrect_metadata_check(df_file):
+        #Creates a new dataframe where the Design Package, Incorporated To, and Specifications are split up and converted into lists for better comparison.
+        incorrect_metadata_file = df_file.copy()
+        pattern_packages = r'(VLW-PKG-.*?)(?=, VLW-PKG-|$)'
+        pattern_specs = r'(VLW-SPC-.*?)(?=, VLW-SPC-|$)'
+        pattern_combined = r'(VLW-(?:PKG|SPC)-.*?)(?=, VLW-(?:PKG|SPC)-|$)'
+        incorrect_metadata_file['Design Package Split Up'] = incorrect_metadata_file['Design Package'].str.extractall(pattern_packages)[0].groupby(level=0).apply(list)
+        incorrect_metadata_file['Specs Split Up'] = incorrect_metadata_file['Specifications'].str.extractall(pattern_specs)[0].groupby(level=0).apply(list)
+        incorrect_metadata_file['Incorporated Design Package Split Up'] = incorrect_metadata_file['Incorporated To'].str.extractall(pattern_combined)[0].groupby(level=0).apply(list)
+
         incorrect_row = []
         
         #Iterating over the entire dataframe to check the if the metadata has been fillout correctly.
@@ -120,8 +122,9 @@ class Stage_1():
                     incorporated_set.update(row['Incorporated Design Package Split Up'])
 
                 if package_spec_combined_set != incorporated_set:
-                    row['Error Type'] = 'Incorrect Packages/Specs for INCORPORATED in Design class of change'
-                    incorrect_row.append(row)
+                    new_row = row.copy() 
+                    new_row['Error Type'] = 'Incorrect Packages/Specs for INCORPORATED in Design class of change'
+                    incorrect_row.append(new_row)
 
             elif row['Class of Change'] == 'Partially Incorporated in Design':
                 
@@ -135,8 +138,9 @@ class Stage_1():
                 sets_intersect = not package_spec_combined_set.isdisjoint(incorporated_set)
 
                 if incorporated_empty or package_spec_empty or sets_intersect:
-                    row['Error Type'] = 'Incorrect Packages/Specs for PARTIALLY INCORPORATED in Design class of change'
-                    incorrect_row.append(row)
+                    new_row = row.copy() 
+                    new_row['Error Type'] = 'Incorrect Packages/Specs for PARTIALLY INCORPORATED in Design class of change'
+                    incorrect_row.append(new_row)
 
             elif row['Class of Change'] == 'Not Incorporated in Design':
 
@@ -144,8 +148,9 @@ class Stage_1():
                 package_spec_empty = not isinstance(row['Specs Split Up'], list) and not isinstance(row['Design Package Split Up'], list)
 
                 if incorporated_empty or package_spec_empty:
-                    row['Error Type'] = 'Incorrect Packages/Specs for NOT INCORPORATED in Design class of change'
-                    incorrect_row.append(row)
+                    new_row = row.copy() 
+                    new_row['Error Type'] = 'Incorrect Packages/Specs for NOT INCORPORATED in Design class of change'
+                    incorrect_row.append(new_row)
 
             elif row['Class of Change'] == 'Field Redline':
 #May be a source of error later on double check with the team.
@@ -153,8 +158,9 @@ class Stage_1():
                 spec_empty = isinstance(row['Specs Split Up'], list)
 
                 if incorporated_empty or spec_empty:
-                    row['Error Type'] = 'Incorrect Packages/Specs for Field Redline class of change'
-                    incorrect_row.append(row)
+                    new_row = row.copy() 
+                    new_row['Error Type'] = 'Incorrect Packages/Specs for Field Redline class of change'
+                    incorrect_row.append(new_row)
 
             #Need to figure out how to check for both 
             elif row['Class of Change'] == 'Field Redline, Incorporated in Design':
@@ -169,8 +175,9 @@ class Stage_1():
                 category_of_change_check = not row['Category of Change'] == 'No Change (response does not result in design change)' 
 
                 if class_of_change_check or reason_for_change_check or category_of_change_check:
-                    row['Error Type'] = 'Metadata associated with RFI Design Directive is Incorrect'
-                    incorrect_row.append(row)
+                    new_row = row.copy() 
+                    new_row['Error Type'] = 'Metadata associated with RFI Design Directive is Incorrect'
+                    incorrect_row.append(new_row)
 
             elif row['Design Directive'] == 'FCD – Field Change Directive':
                 class_of_change_check = row['Class of Change'] == 'No Action Required' or row['Class of Change'] == 'Non-Design Change' or row['Class of Change'] in [None, '', np.nan]
@@ -178,10 +185,20 @@ class Stage_1():
                 category_of_change_check = row['Category of Change'] == 'No Change (response does not result in design change)' or row['Category of Change'] in [None, '', np.nan]
 
                 if class_of_change_check or reason_for_change_check or category_of_change_check:
-                    row['Error Type'] = 'Metadata associated with FCD Design Directive is Incorrect'
-                    incorrect_row.append(row)
+                    new_row = row.copy() 
+                    new_row['Error Type'] = 'Metadata associated with FCD Design Directive is Incorrect'
+                    incorrect_row.append(new_row)
 
-        return pd.DataFrame(incorrect_row)
+            if row['Discipline'] == 'Design and Construction':
+                new_row = row.copy() 
+                new_row['Error Type'] = 'Discipline is set to Design and Construction'
+                incorrect_row.append(new_row)
+
+        incorrect_metadata_file = pd.DataFrame(incorrect_row)
+        incorrect_metadata_file = incorrect_metadata_file[['Document No', 'Title', 'Design Directive', 'Class of Change', 'Category of Change', 
+                                                            'Reason for Change', 'Design Package', 'Specifications', 'Incorporated To', 'Error Type']]
+        
+        return incorrect_metadata_file
     
     def format_and_save_excel(self, dataframes_with_sheet_names, file_path):
         # Create a Pandas Excel writer using XlsxWriter as the engine
@@ -226,3 +243,59 @@ class Stage_1():
                 dataframe.to_excel(writer, sheet_name=sheet_name, index=False)
                 # Apply formatting to each worksheet
                 format_worksheet(writer.sheets[sheet_name], dataframe)
+        
+    def stage_2(self):
+        excel_file_4 = 'stage_one_documents/ExportDocs_Stage_2.xls' 
+        temp_df_2 = pd.read_excel(excel_file_4, header=None)
+        exportDocs_2 = Excel_Manipulation.find_header(temp_df_2, excel_file_4)
+
+        excel_file_2 = 'stage_one_documents/ExportDocs_Stage_1.xls' 
+        temp_df = pd.read_excel(excel_file_2, header=None)
+        exportDocs_1 = Excel_Manipulation.find_header(temp_df, excel_file_2)
+
+        excel_file_2 = 'stage_one_documents/VLW-LOG-11000050-DC-0001_SQ_old.xls'
+        VLW_LOG_11000050_DC_0001_SQ_old = pd.read_excel(excel_file_2)
+
+        #Create a set of unique identifiers from exportDocs_1.
+        unique_identifiers_new_SQs = set(exportDocs_1['Document No'])
+        #Filter out rows in exportDocs_2 that are not in exportDocs_1.
+        exportDocs_2_filtered = exportDocs_2[exportDocs_2['Document No'].isin(unique_identifiers_new_SQs)]
+
+        #Create a set of unique identifiers from exportDocs_2.
+        unique_identifiers_opended_SQs = set(exportDocs_2['Document No'])
+        exportDocs_1_filtered = exportDocs_1[~exportDocs_1['Document No'].isin(unique_identifiers_opended_SQs)]
+        unique_identifiers_rev_0_open_again = set(VLW_LOG_11000050_DC_0001_SQ_old ['Document No'])
+        exportDocs_1_filtered_to_add = exportDocs_1_filtered[exportDocs_1_filtered['Document No'].isin(unique_identifiers_rev_0_open_again)]
+        SQ_metadata_closed_df_stage_2 = pd.concat([exportDocs_2_filtered, exportDocs_1_filtered_to_add])
+        SQ_metadata_closed_df_stage_2_sorted = SQ_metadata_closed_df_stage_2.sort_values(by= 'Document No')
+
+        SQ_metadata_closed_df_stage_2_sorted.to_excel('data/SQ_metadata_closed_file_2.xlsx', index=False)
+
+        missing_metadata_file_2 = Excel_Manipulation.missing_metadata_check(SQ_metadata_closed_df_stage_2_sorted)
+        incorrect_metadata_file_stage_2 = Excel_Manipulation.incorrect_metadata_check(SQ_metadata_closed_df_stage_2_sorted)
+
+        #Create a downloadable version of the dataframe that contains both the incorrect and missing metadata. 
+        with pd.ExcelWriter('data/missing_incorrect_metadata_file_2.xlsx') as writer:
+            missing_metadata_file_2.to_excel(writer, sheet_name='SQs With Missing Data 2', index=False)
+            incorrect_metadata_file_stage_2.to_excel(writer, sheet_name='SQs With Incorrect Data 2', index=False)
+            exportDocs_1_filtered_to_add.to_excel(writer, sheet_name='test', index=False)
+
+        incorrect_missing_df_sheet_names_stage_2 = [(missing_metadata_file_2, 'SQs With Missing Data 2'), (incorrect_metadata_file_stage_2, 'SQs With Incorrect Data 2')]
+
+        #Format the Excel file
+        self.format_and_save_excel(incorrect_missing_df_sheet_names_stage_2, 'data/missing_incorrect_metadata_file_2.xlsx')
+
+    def find_header(temp_df, excel_file):
+        header_row = None
+        for i, row in temp_df.iterrows():
+            if row.str.contains('Document No').any():
+                header_row = i
+                break
+        if header_row is not None:
+            exportDocs = pd.read_excel(excel_file, header=header_row)
+        else:
+            raise ValueError("Header row with 'Document no' not found in the Export Document")
+    
+        return exportDocs
+
+
