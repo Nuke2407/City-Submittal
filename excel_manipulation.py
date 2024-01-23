@@ -244,7 +244,7 @@ class Excel_Manipulation():
                 # Apply formatting to each worksheet
                 format_worksheet(writer.sheets[sheet_name], dataframe)
         
-    def stage_2(self):
+    def stage_2_part_1(self):
         excel_file_4 = 'stage_one_documents/ExportDocs_Stage_2.xls' 
         temp_df_2 = pd.read_excel(excel_file_4, header=None)
         exportDocs_2 = Excel_Manipulation.find_header(temp_df_2, excel_file_4)
@@ -284,6 +284,7 @@ class Excel_Manipulation():
 
         #Format the Excel file
         self.format_and_save_excel(incorrect_missing_df_sheet_names_stage_2, 'data/missing_incorrect_metadata_file_2.xlsx')
+
 
     def find_header(temp_df, excel_file):
         header_row = None
