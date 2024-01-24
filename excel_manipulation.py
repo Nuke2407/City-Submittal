@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import os
 
 class Excel_Manipulation():
     def stage_1(self):
@@ -8,7 +9,7 @@ class Excel_Manipulation():
         self.missing_metadata_file_1 = Excel_Manipulation.missing_metadata_check(self.SQ_metadata_closed_file)
         self.incorrect_metadata_file_stage_1 = Excel_Manipulation.incorrect_metadata_check(self.SQ_metadata_closed_file)
 
-        #Create a downloadable version of the dataframe that contains both the incorrect and missing metadata. 
+        #Create a downloadable version of the row that contains both the incorrect and missing metadata. 
         with pd.ExcelWriter('data/missing_incorrect_metadata_file.xlsx') as writer:
             self.missing_metadata_file_1.to_excel(writer, sheet_name='SQs With Missing Data', index=False)
             self.incorrect_metadata_file_stage_1.to_excel(writer, sheet_name='SQs With Incorrect Data', index=False)
@@ -23,7 +24,7 @@ class Excel_Manipulation():
         excel_file_2 = 'stage_one_documents/VLW-LOG-11000050-DC-0001_SQ_old.xls'
         excel_file_3 = 'stage_one_documents/ExportDocs_Stage_1.xls'
 
-        #Reads the excel file and stores the datat in Dataframes. The 'header=' sets the header to the 12th excel column.
+        #Reads the excel file and stores the datat in rows. The 'header=' sets the header to the 12th excel column.
         self.SQ_metadata_closed_file = pd.read_excel(excel_file_1, header=0)
         VLW_LOG_11000050_DC_0001_SQ_old = pd.read_excel(excel_file_2)
 
@@ -62,7 +63,7 @@ class Excel_Manipulation():
         self.SQ_metadata_closed_file['Rev. updated?(Y/N/NA)'] = self.SQ_metadata_closed_file.apply(check_SQ_Rev, axis=1)
         self.SQ_metadata_closed_file['If already sent to City?(Y/N)'] = self.SQ_metadata_closed_file['Document No'].apply(lambda x: 'Y' if x in vlw_doc_and_revisions else 'N')
 
-        #Filter the DataFrame to only include rows with 'N' in the 'If already sent to City?(Y/N)' column.
+        #Filter the row to only include rows with 'N' in the 'If already sent to City?(Y/N)' column.
         self.new_SQs_for_city_submittal = self.SQ_metadata_closed_file.loc[
             (self.SQ_metadata_closed_file['If already sent to City?(Y/N)'] == 'N') & 
             (((self.SQ_metadata_closed_file['Design Directive'] == 'FCD – Field Change Directive') | 
@@ -71,7 +72,7 @@ class Excel_Manipulation():
             ((self.SQ_metadata_closed_file['Category of Change'].isnull()) | 
             (self.SQ_metadata_closed_file['Class of Change'].isnull()))))]
             
-        #Filter the DataFrame to only include rows with 'Y' in the 'If already sent to City?(Y/N)' column and rows with 'Y' in the 'Rev. updated?(Y/N/NA)' column.
+        #Filter the row to only include rows with 'Y' in the 'If already sent to City?(Y/N)' column and rows with 'Y' in the 'Rev. updated?(Y/N/NA)' column.
         self.new_reved_up_SQs_for_city_submittal = self.SQ_metadata_closed_file.loc[(self.SQ_metadata_closed_file['If already sent to City?(Y/N)'] == 'Y') & (self.SQ_metadata_closed_file['Rev. updated?(Y/N/NA)'] == 'Y') & (self.SQ_metadata_closed_file['Design Directive'] == 'FCD – Field Change Directive')]
 
         with pd.ExcelWriter('data/new_city_sub_SQs.xlsx') as writer:
@@ -96,7 +97,7 @@ class Excel_Manipulation():
         return df_file
 
     def incorrect_metadata_check(df_file):
-        #Creates a new dataframe where the Design Package, Incorporated To, and Specifications are split up and converted into lists for better comparison.
+        #Creates a new row where the Design Package, Incorporated To, and Specifications are split up and converted into lists for better comparison.
         incorrect_metadata_file = df_file.copy()
         pattern_packages = r'(VLW-PKG-.*?)(?=, VLW-PKG-|$)'
         pattern_specs = r'(VLW-SPC-.*?)(?=, VLW-SPC-|$)'
@@ -107,7 +108,7 @@ class Excel_Manipulation():
 
         incorrect_row = []
         
-        #Iterating over the entire dataframe to check the if the metadata has been fillout correctly.
+        #Iterating over the entire row to check the if the metadata has been fillout correctly.
         for index, row in incorrect_metadata_file.iterrows():
             #Checking completeness of the metadata associated with the Class of Change. 
             if row['Class of Change'] == 'Incorporated in Design':
@@ -200,7 +201,7 @@ class Excel_Manipulation():
         
         return incorrect_metadata_file
     
-    def format_and_save_excel(self, dataframes_with_sheet_names, file_path):
+    def format_and_save_excel(self, rows_with_sheet_names, file_path):
         # Create a Pandas Excel writer using XlsxWriter as the engine
         with pd.ExcelWriter(file_path, engine='xlsxwriter') as writer:
             # Access the workbook and configure it
@@ -220,29 +221,29 @@ class Excel_Manipulation():
             cell_format = workbook.add_format({'border': 1})
 
             # Function to apply formatting to a worksheet
-            def format_worksheet(worksheet, dataframe):
+            def format_worksheet(worksheet, row):
                 # Write the column headers with the defined format
-                for col_num, value in enumerate(dataframe.columns.values):
+                for col_num, value in enumerate(row.columns.values):
                     worksheet.write(0, col_num, value, header_format)
                     # Set column width based on the maximum length of the content in each column
-                    column_len = max(dataframe[value].astype(str).map(len).max(), len(value))
+                    column_len = max(row[value].astype(str).map(len).max(), len(value))
                     worksheet.set_column(col_num, col_num, column_len)
 
                 # Apply the cell format to each cell in the data
-                for row_num in range(1, len(dataframe) + 1):
-                    for col_num in range(len(dataframe.columns)):
-                        cell_value = dataframe.iloc[row_num - 1, col_num]
+                for row_num in range(1, len(row) + 1):
+                    for col_num in range(len(row.columns)):
+                        cell_value = row.iloc[row_num - 1, col_num]
                         # Check for NaT values and replace with None
                         if pd.isna(cell_value):
                             cell_value = None
                         worksheet.write(row_num, col_num, cell_value, cell_format)
 
-            # Write each DataFrame to its respective sheet and apply formatting
-            for dataframe, sheet_name in dataframes_with_sheet_names:
-                # Write the dataframe data to XlsxWriter
-                dataframe.to_excel(writer, sheet_name=sheet_name, index=False)
+            # Write each row to its respective sheet and apply formatting
+            for row, sheet_name in rows_with_sheet_names:
+                # Write the row data to XlsxWriter
+                row.to_excel(writer, sheet_name=sheet_name, index=False)
                 # Apply formatting to each worksheet
-                format_worksheet(writer.sheets[sheet_name], dataframe)
+                format_worksheet(writer.sheets[sheet_name], row)
         
     def stage_2_part_1(self):
         excel_file_4 = 'stage_one_documents/ExportDocs_Stage_2.xls' 
@@ -274,7 +275,7 @@ class Excel_Manipulation():
         missing_metadata_file_2 = Excel_Manipulation.missing_metadata_check(SQ_metadata_closed_df_stage_2_sorted)
         incorrect_metadata_file_stage_2 = Excel_Manipulation.incorrect_metadata_check(SQ_metadata_closed_df_stage_2_sorted)
 
-        #Create a downloadable version of the dataframe that contains both the incorrect and missing metadata. 
+        #Create a downloadable version of the row that contains both the incorrect and missing metadata. 
         with pd.ExcelWriter('data/missing_incorrect_metadata_file_2.xlsx') as writer:
             missing_metadata_file_2.to_excel(writer, sheet_name='SQs With Missing Data 2', index=False)
             incorrect_metadata_file_stage_2.to_excel(writer, sheet_name='SQs With Incorrect Data 2', index=False)
@@ -285,6 +286,69 @@ class Excel_Manipulation():
         #Format the Excel file
         self.format_and_save_excel(incorrect_missing_df_sheet_names_stage_2, 'data/missing_incorrect_metadata_file_2.xlsx')
 
+    def stage_2_part_2(self):
+        excel_file_5 = 'data/SQ_metadata_closed_file_2.xlsx' 
+        temp_df_5 = pd.read_excel(excel_file_5, header=None)
+        final_export_df_sheet_1 = Excel_Manipulation.find_header(temp_df_5, excel_file_5)
+        
+        excel_file_2 = 'stage_one_documents/VLW-LOG-11000050-DC-0001_SQ_old.xls'
+        VLW_LOG_11000050_DC_0001_SQ_old = pd.read_excel(excel_file_2)
+
+        new_batch_number = max(VLW_LOG_11000050_DC_0001_SQ_old['Batch #']) + 1 
+        sqs_in_old_log = set(VLW_LOG_11000050_DC_0001_SQ_old['Document No'])
+        final_export_df_FCD_only = final_export_df_sheet_1[final_export_df_sheet_1['Design Directive'].str.contains('FCD – Field Change Directive')].copy()
+        final_export_df_FCD_only['Previous Batch #'] = ''
+        final_export_df_FCD_only['Comment'] = ''
+        final_export_df_FCD_only = final_export_df_FCD_only.rename(columns={'Incorporated To': 'Design Package(s) - Incorporated To'})
+
+        sqs_with_issues = []
+        def update_rows(row):
+            if row['Class of Change'] == 'Field Redline' or 'Not Incorportated in Design' or 'Field Redline, Not Incorportated in Design' or 'Not Incorporated in Design, Field Redline':
+                row['Design Package(s)'] = row['Design Package']
+                row['Design Package(s) - Not Incorporated to'] = row['Design Package']
+
+            elif row['Class of Change'] == 'Incorporated in Design':
+                row['Design Package(s)'] = row['Design Package']
+                row['Design Package(s) - Not Incorporated to'] = 'N/A'
+
+            elif row['Class of Change'] == 'Partially Incorporated in Desing' or 'Field Redline, Incorporated in Design' or 'Incorporated in Design, Field Redline':
+                row['Design Package(s)'] = row['Design Package'] + ',' + row['Design Package(s) - Incorporated To']
+                row['Design Package(s) - Not Incorporated to'] = row['Design Package']
+            else: 
+                sqs_with_issues.append(row)
+
+            if row['Document No'] in sqs_in_old_log:
+                row['Batch #'] = VLW_LOG_11000050_DC_0001_SQ_old.loc[VLW_LOG_11000050_DC_0001_SQ_old['Document No'] == row['Document No'], 'Batch #'].iloc[0]
+            else: 
+                row['Batch #'] = new_batch_number
+
+            return row
+        
+        final_export_df_FCD_only = final_export_df_FCD_only.apply(update_rows, axis=1)
+
+        city_submittal_sheet_1_formated = final_export_df_FCD_only[['Document No', 'Revision', 'Title', 'Discipline', 'Design Package(s)', 'Design Package(s) - Not Incorporated to', 'Design Package(s) - Incorporated To', 'Specifications', 'Category of Change', 'Revision Date',	'Design Directive', 'Status', 'Class of Change', 'Batch #',	'Previous Batch #', 'Comment']]
+
+        #Add SQs that are now open from the previous log exclusing the superseded 'Cancelled' ones. 
+        new_log_identifiers = city_submittal_sheet_1_formated['Document No']
+        sqs_to_add_back = VLW_LOG_11000050_DC_0001_SQ_old[~VLW_LOG_11000050_DC_0001_SQ_old['Document No'].isin(new_log_identifiers)]
+        closed_sqs_to_add_back = sqs_to_add_back[sqs_to_add_back['Status'].str.contains('Closed')].copy()
+        city_submittal_sheet_1_formated_sqs_added = pd.concat([city_submittal_sheet_1_formated, closed_sqs_to_add_back])
+
+        #Delete on hold SQs if not in the previous log or add the version that was sent in the previous city sub. Only executes function if a sq_removal_excel file was uploaded. 
+        excel_file_6 = 'stage_one_documents/sq_removal_excel.xlsx' 
+        if os.path.exists(excel_file_6):
+            sqs_on_hold_df = pd.read_excel(excel_file_6, sheet_name='SQs on hold', header=0)
+            sqs_to_supersed_df = pd.read_excel(excel_file_6, sheet_name='SQs to supersed', header=0)
+
+            if not sqs_on_hold_df.empty:
+                sqs_to_delete = sqs_on_hold_df['Document No'].to_list()
+                city_submittal_sheet_1_formated_on_hold_sqs_removed = city_submittal_sheet_1_formated_sqs_added[~city_submittal_sheet_1_formated_sqs_added['Document No'].isin(sqs_to_delete)]
+                sqs_to_add_back_2 = VLW_LOG_11000050_DC_0001_SQ_old[VLW_LOG_11000050_DC_0001_SQ_old['Document No'].isin(sqs_to_delete)]
+                city_submittal_sheet_1_formated_sqs_added = pd.concat([city_submittal_sheet_1_formated_on_hold_sqs_removed, sqs_to_add_back_2])
+
+        city_submittal_sheet_1_formated = city_submittal_sheet_1_formated.sort_values(by= 'Document No')
+
+        city_submittal_sheet_1_formated.to_excel('data/TESTING.xlsx', index=False)
 
     def find_header(temp_df, excel_file):
         header_row = None

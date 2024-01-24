@@ -259,7 +259,7 @@ class App(customtkinter.CTk):
                 #Correct file selected, move it to the stage_one_documents folder
                 destination_folder = os.path.join(os.path.dirname(os.path.realpath(__file__)), "stage_one_documents")
                 shutil.copy(filepath, os.path.join(destination_folder, "ExportDocs_Stage_2.xls"))
-                Excel_Manipulation().stage_2()
+                Excel_Manipulation().stage_2_part_1()
                 create_missing_incorrect_data_table_stage_2(self, 'data/missing_incorrect_metadata_file_2.xlsx')
                 self.sq_removal_ui_creation()
             else:
@@ -282,7 +282,7 @@ class App(customtkinter.CTk):
         self.upload_on_hold_superseded_file_button = customtkinter.CTkButton(self.upload_download_buttons_frame, text="Upload sq_removal_excel.xlsx File", command=self.upload_sq_removal_excel_file)
         self.upload_on_hold_superseded_file_button.grid(row=1, column=1)
 
-        self.process_files_stage_2_button = customtkinter.CTkButton(self.step_two_frame, text="Process Files", command=self.process_files_stage_2, state="disabled")
+        self.process_files_stage_2_button = customtkinter.CTkButton(self.step_two_frame, text="Process Files", command=self.process_files_stage_2)
         self.process_files_stage_2_button.grid(row=5, column=0)
     
     def download_sq_removal_excel_fomat():
@@ -311,7 +311,6 @@ class App(customtkinter.CTk):
                 #Correct file selected, move it to the stage_one_documents folder
                 destination_folder = os.path.join(os.path.dirname(os.path.realpath(__file__)), "stage_one_documents")
                 shutil.copy(filepath, os.path.join(destination_folder, "sq_removal_excel.xls"))
-                Excel_Manipulation().stage_2_part_1()
             else:
                 #Incorrect file name, show an error message
                 messagebox.showerror("Error", "Please select a file named 'sq_removal_excel.xlsx'.")
