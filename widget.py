@@ -310,7 +310,7 @@ class App(customtkinter.CTk):
             if os.path.basename(filepath) == "sq_removal_excel.xlsx":
                 #Correct file selected, move it to the stage_one_documents folder
                 destination_folder = os.path.join(os.path.dirname(os.path.realpath(__file__)), "stage_one_documents")
-                shutil.copy(filepath, os.path.join(destination_folder, "sq_removal_excel.xls"))
+                shutil.copy(filepath, os.path.join(destination_folder, "sq_removal_excel.xlsx"))
             else:
                 #Incorrect file name, show an error message
                 messagebox.showerror("Error", "Please select a file named 'sq_removal_excel.xlsx'.")

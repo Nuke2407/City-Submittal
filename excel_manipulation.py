@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import os
+from tkinter import messagebox
 
 class Excel_Manipulation():
     def stage_1(self):
@@ -201,7 +202,7 @@ class Excel_Manipulation():
         
         return incorrect_metadata_file
     
-    def format_and_save_excel(self, rows_with_sheet_names, file_path):
+    def format_and_save_excel(self, dataframes_with_sheet_names, file_path):
         # Create a Pandas Excel writer using XlsxWriter as the engine
         with pd.ExcelWriter(file_path, engine='xlsxwriter') as writer:
             # Access the workbook and configure it
@@ -221,29 +222,29 @@ class Excel_Manipulation():
             cell_format = workbook.add_format({'border': 1})
 
             # Function to apply formatting to a worksheet
-            def format_worksheet(worksheet, row):
+            def format_worksheet(worksheet, dataframe):
                 # Write the column headers with the defined format
-                for col_num, value in enumerate(row.columns.values):
+                for col_num, value in enumerate(dataframe.columns.values):
                     worksheet.write(0, col_num, value, header_format)
                     # Set column width based on the maximum length of the content in each column
-                    column_len = max(row[value].astype(str).map(len).max(), len(value))
+                    column_len = max(dataframe[value].astype(str).map(len).max(), len(value))
                     worksheet.set_column(col_num, col_num, column_len)
 
                 # Apply the cell format to each cell in the data
-                for row_num in range(1, len(row) + 1):
-                    for col_num in range(len(row.columns)):
-                        cell_value = row.iloc[row_num - 1, col_num]
+                for row_num in range(1, len(dataframe) + 1):
+                    for col_num in range(len(dataframe.columns)):
+                        cell_value = dataframe.iloc[row_num - 1, col_num]
                         # Check for NaT values and replace with None
                         if pd.isna(cell_value):
                             cell_value = None
                         worksheet.write(row_num, col_num, cell_value, cell_format)
 
-            # Write each row to its respective sheet and apply formatting
-            for row, sheet_name in rows_with_sheet_names:
-                # Write the row data to XlsxWriter
-                row.to_excel(writer, sheet_name=sheet_name, index=False)
+            # Write each DataFrame to its respective sheet and apply formatting
+            for dataframe, sheet_name in dataframes_with_sheet_names:
+                # Write the DataFrame data to XlsxWriter
+                dataframe.to_excel(writer, sheet_name=sheet_name, index=False)
                 # Apply formatting to each worksheet
-                format_worksheet(writer.sheets[sheet_name], row)
+                format_worksheet(writer.sheets[sheet_name], dataframe)
         
     def stage_2_part_1(self):
         excel_file_4 = 'stage_one_documents/ExportDocs_Stage_2.xls' 
@@ -294,7 +295,7 @@ class Excel_Manipulation():
         excel_file_2 = 'stage_one_documents/VLW-LOG-11000050-DC-0001_SQ_old.xls'
         VLW_LOG_11000050_DC_0001_SQ_old = pd.read_excel(excel_file_2)
 
-        new_batch_number = max(VLW_LOG_11000050_DC_0001_SQ_old['Batch #']) + 1 
+        self.new_batch_number = max(VLW_LOG_11000050_DC_0001_SQ_old['Batch #']) + 1 
         sqs_in_old_log = set(VLW_LOG_11000050_DC_0001_SQ_old['Document No'])
         final_export_df_FCD_only = final_export_df_sheet_1[final_export_df_sheet_1['Design Directive'].str.contains('FCD – Field Change Directive')].copy()
         final_export_df_FCD_only['Previous Batch #'] = ''
@@ -320,7 +321,7 @@ class Excel_Manipulation():
             if row['Document No'] in sqs_in_old_log:
                 row['Batch #'] = VLW_LOG_11000050_DC_0001_SQ_old.loc[VLW_LOG_11000050_DC_0001_SQ_old['Document No'] == row['Document No'], 'Batch #'].iloc[0]
             else: 
-                row['Batch #'] = new_batch_number
+                row['Batch #'] = self.new_batch_number
 
             return row
         
@@ -334,21 +335,172 @@ class Excel_Manipulation():
         closed_sqs_to_add_back = sqs_to_add_back[sqs_to_add_back['Status'].str.contains('Closed')].copy()
         city_submittal_sheet_1_formated_sqs_added = pd.concat([city_submittal_sheet_1_formated, closed_sqs_to_add_back])
 
+
+        excel_file_7 = 'data/new_city_sub_SQs.xlsx'
+        if os.path.exists(excel_file_7):
+            sqs_reved_up = pd.read_excel(excel_file_7, sheet_name='Reved up SQs', header=0)
+            if not sqs_reved_up.empty:
+                for index, row in sqs_reved_up.iterrows():
+                    city_submittal_sheet_1_formated_sqs_added.loc[city_submittal_sheet_1_formated_sqs_added['Document No'] == row['Document No'], 'Previous Batch #'] = city_submittal_sheet_1_formated_sqs_added.loc[city_submittal_sheet_1_formated_sqs_added['Document No'] == row['Document No'], 'Batch #']
+                    city_submittal_sheet_1_formated_sqs_added.loc[city_submittal_sheet_1_formated_sqs_added['Document No'] == row['Document No'], 'Batch #'] = self.new_batch_number
+        else:
+            messagebox.showerror("Error", "For some reason 'new_city_sub_SQs.xlsx' is missing. Try restarting the entire City Submittal process.")
+
         #Delete on hold SQs if not in the previous log or add the version that was sent in the previous city sub. Only executes function if a sq_removal_excel file was uploaded. 
         excel_file_6 = 'stage_one_documents/sq_removal_excel.xlsx' 
         if os.path.exists(excel_file_6):
             sqs_on_hold_df = pd.read_excel(excel_file_6, sheet_name='SQs on hold', header=0)
             sqs_to_supersed_df = pd.read_excel(excel_file_6, sheet_name='SQs to supersed', header=0)
-
             if not sqs_on_hold_df.empty:
                 sqs_to_delete = sqs_on_hold_df['Document No'].to_list()
                 city_submittal_sheet_1_formated_on_hold_sqs_removed = city_submittal_sheet_1_formated_sqs_added[~city_submittal_sheet_1_formated_sqs_added['Document No'].isin(sqs_to_delete)]
                 sqs_to_add_back_2 = VLW_LOG_11000050_DC_0001_SQ_old[VLW_LOG_11000050_DC_0001_SQ_old['Document No'].isin(sqs_to_delete)]
                 city_submittal_sheet_1_formated_sqs_added = pd.concat([city_submittal_sheet_1_formated_on_hold_sqs_removed, sqs_to_add_back_2])
+            if not sqs_to_supersed_df.empty:
+                for index, row in sqs_to_supersed_df.iterrows(): 
+                    superseding_sq_number = row['Document No of superseding SQ'][-4:]
+                    superseding_sq_revision_number = str(row['Revision No of superseding SQ'])[-1:]
+                    city_submittal_sheet_1_formated_sqs_added.loc[city_submittal_sheet_1_formated_sqs_added['Document No'] == row['Document No'], 'Comment'] = f"This SQ is obsolete and superseded by SQ-{superseding_sq_number} REV 0{superseding_sq_revision_number}. It will be permanently deleted starting from City Submittal #{self.new_batch_number + 1}"
+                    city_submittal_sheet_1_formated_sqs_added.loc[city_submittal_sheet_1_formated_sqs_added['Document No'] == row['Document No'], 'Status'] = 'Cancelled'
+                    city_submittal_sheet_1_formated_sqs_added.loc[city_submittal_sheet_1_formated_sqs_added['Document No'] == row['Document No'], 'Previous Batch #'] = city_submittal_sheet_1_formated_sqs_added.loc[city_submittal_sheet_1_formated_sqs_added['Document No'] == row['Document No'], 'Batch #']
+                    city_submittal_sheet_1_formated_sqs_added.loc[city_submittal_sheet_1_formated_sqs_added['Document No'] == row['Document No'], 'Batch #'] = self.new_batch_number
+	
+        city_submittal_sheet_1_formated_sqs_added = city_submittal_sheet_1_formated_sqs_added.sort_values(by= 'Document No')
 
-        city_submittal_sheet_1_formated = city_submittal_sheet_1_formated.sort_values(by= 'Document No')
+        dataframes_with_sheet_names = [(city_submittal_sheet_1_formated_sqs_added, f'Batch#{self.new_batch_number}')]
+        self.format_sheet_1_final_export(dataframes_with_sheet_names, 'City Submittal.xlsx')
 
-        city_submittal_sheet_1_formated.to_excel('data/TESTING.xlsx', index=False)
+
+    def format_sheet_1_final_export(self, dataframes_with_sheet_names, file_path):
+        # Create a Pandas Excel writer using XlsxWriter as the engine
+        with pd.ExcelWriter(file_path, engine='xlsxwriter') as writer:
+            # Access the workbook and configure it
+            workbook = writer.book
+            workbook.nan_inf_to_errors = True
+
+            # Define a format for the header
+            header_format = workbook.add_format({
+                'font_size': 10,
+                'bold': True,
+                'text_wrap': True,
+                'valign': 'vcenter',
+                'align': 'center',
+                'font_color': '#00008B',
+                'border': 1})
+            # Define a format for the data cells with borders
+            cell_format = workbook.add_format({
+                'font_size': 10,
+                'text_wrap': True,
+                'valign': 'vcenter',
+                'align': 'center',
+                'border': 1,})
+            date_format = workbook.add_format({
+                'font_size': 10,
+                'text_wrap': True,
+                'valign': 'vcenter',
+                'align': 'center',
+                'border': 1,
+                'num_format': 'mm/dd/yyyy'
+                })
+            yellow_format = workbook.add_format({
+                'font_size': 10, 
+                'bg_color': '#FFFF00', 
+                'text_wrap': True, 
+                'valign': 'vcenter', 
+                'align': 'center', 
+                'border': 1})  
+            yellow_format_date = workbook.add_format({
+                'font_size': 10, 
+                'bg_color': '#FFFF00', 
+                'text_wrap': True, 
+                'valign': 'vcenter', 
+                'align': 'center', 
+                'border': 1, 
+                'num_format': 'mm/dd/yyyy'})
+            red_format = workbook.add_format({
+                'font_size': 10, 
+                'bg_color': '#FF0000', 
+                'text_wrap': True, 
+                'valign': 'vcenter', 
+                'align': 'center', 
+                'border': 1}) 
+            red_format_date = workbook.add_format({
+                'font_size': 10, 
+                'bg_color': '#FF0000', 
+                'text_wrap': True, 
+                'valign': 'vcenter', 
+                'align': 'center', 
+                'border': 1, 
+                'num_format': 'mm/dd/yyyy'})    
+
+            # Function to apply formatting to a worksheet
+            def format_worksheet(worksheet, dataframe):
+                # Write the column headers with the defined format
+                for col_num, value in enumerate(dataframe.columns.values):
+                    worksheet.write(0, col_num, value, header_format)
+                    worksheet.set_zoom(70)
+
+                    # Set specific column widths
+                    if value in ['Design Package(s)', 'Design Package(s) - Not Incorporated to', 'Design Package(s) - Incorporated To', 'Specifications']:
+                        worksheet.set_column(col_num, col_num, 60)  
+                    elif value in ['Document No', 'Comment', 'Title']:
+                        worksheet.set_column(col_num, col_num, 30)
+                    elif value in ['Discipline', 'Category of Change', 'Design Directive', 'Class of Change']:
+                        worksheet.set_column(col_num, col_num, 21)
+                    elif value in ['Revision', 'Revision Date', 'Status', 'Batch', 'Previous Batch #']:
+                        worksheet.set_column(col_num, col_num, 11)
+
+                # Set row height to 69 pixels (approximately 51 points)
+                worksheet.set_default_row(80)
+
+                # Conditional formatting
+                previous_batch_col = None
+                comment_col = None
+                for col_num, column_name in enumerate(dataframe.columns):
+                    if column_name == 'Previous Batch #':
+                        previous_batch_col = col_num
+                    if column_name == 'Comment':
+                        comment_col = col_num
+
+                # Apply the cell format to each cell in the data
+                for row_num in range(1, len(dataframe) + 1):
+                    for col_num, column_name in enumerate(dataframe.columns):
+                        cell_value = dataframe.iloc[row_num - 1, col_num]
+                        # Check for NaT values and replace with None
+                        if pd.isna(cell_value):
+                            cell_value = None
+                        worksheet.write(row_num, col_num, cell_value, cell_format)
+
+                        if column_name == 'Revision Date' and cell_value is not None:
+                            worksheet.write(row_num, col_num, cell_value, date_format)
+                        else:
+                            worksheet.write(row_num, col_num, cell_value, cell_format)
+
+                        # Apply yellow highlight if 'Previous Batch #' has content
+                        if previous_batch_col is not None and dataframe.iloc[row_num - 1, previous_batch_col] and column_name == 'Revision Date':
+                            worksheet.write(row_num, col_num, cell_value, yellow_format_date)
+                        elif previous_batch_col is not None and dataframe.iloc[row_num - 1, previous_batch_col]:
+                            worksheet.write(row_num, col_num, cell_value, yellow_format)
+
+                        # Apply red highlight if 'Comment' has content
+                        if comment_col is not None and dataframe.iloc[row_num - 1, comment_col] and column_name == 'Revision Date':
+                            worksheet.write(row_num, col_num, cell_value, red_format_date)
+                        elif comment_col is not None and dataframe.iloc[row_num - 1, comment_col]:
+                            worksheet.write(row_num, col_num, cell_value, red_format)
+
+
+            # Write each DataFrame to its respective sheet and apply formatting
+            for dataframe, sheet_name in dataframes_with_sheet_names:
+                # Write the DataFrame data to XlsxWriter
+                dataframe.to_excel(writer, sheet_name=sheet_name, index=False)
+                # Apply formatting to each worksheet
+                format_worksheet(writer.sheets[sheet_name], dataframe)
+
+                if sheet_name == f'Batch#{self.new_batch_number}':
+                    (max_row, max_col) = dataframe.shape
+                    writer.sheets[sheet_name].autofilter(0, 0, max_row, max_col - 1)
+                    writer.sheets[sheet_name].freeze_panes(1, 0)
+                    
 
     def find_header(temp_df, excel_file):
         header_row = None
