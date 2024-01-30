@@ -173,7 +173,7 @@ class Excel_Manipulation():
 
             #Checking completeness of the metadata associated with the Design Directive. 
             if row['Design Directive'] == 'RFI – No Design Change':
-                class_of_change_check = not row['Class of Change'] == 'No Action Required' 
+                class_of_change_check = not row['Class of Change'] in ['No Action Required', 'Field Redline']
                 reason_for_change_check = not row['Reason for Change'] == 'Request for Information/Clarification' 
                 category_of_change_check = not row['Category of Change'] == 'No Change (response does not result in design change)' 
 
@@ -440,19 +440,94 @@ class Excel_Manipulation():
                         city_submittal_sheet_4.at[match_index[0], 'Incorporated in Design'] += 1
 
         city_submittal_sheet_4 = city_submittal_sheet_4.sort_values(by= 'Design package number')
-
-        dataframes_with_sheet_1_info = [(city_submittal_sheet_1, f'Batch#{self.new_batch_number}')]
-        dataframes_with_sheet_4_info = [(city_submittal_sheet_4, 'Summary-Design Package Tracker')]
-        self.write_to_excel('data/City Submittal.xlsx', dataframes_with_sheet_1_info, dataframes_with_sheet_4_info)
         
-    def write_to_excel(self, file_path, dataframes_for_sheet_1, dataframes_for_sheet_4):
+        #Sheet #2
+        #=========================================================================================================================================================================================================
+        
+        #Table #1
+        city_submittal_sheet_2_setup_table_1 = pd.DataFrame(columns= ['Discipline', 'SQ Count'])
+        for index, row in city_submittal_sheet_1_formated_sqs_added.iterrows():
+            if row['Status'] == 'Closed':
+                if row['Discipline'] not in city_submittal_sheet_2_setup_table_1['Discipline'].tolist():
+                    new_row = {
+                            'Discipline': row['Discipline'], 
+                            'SQ Count': 0}
+                    new_row_df = pd.DataFrame([new_row])
+                    city_submittal_sheet_2_setup_table_1 = pd.concat([city_submittal_sheet_2_setup_table_1, new_row_df], ignore_index=True)
+
+                match_index = city_submittal_sheet_2_setup_table_1.index[city_submittal_sheet_2_setup_table_1['Discipline'] == row['Discipline']].tolist()
+                if row['Discipline'] in city_submittal_sheet_2_setup_table_1['Discipline'].tolist():
+                    city_submittal_sheet_2_setup_table_1.at[match_index[0], 'SQ Count'] += 1
+        
+        total_df = pd.DataFrame([{'Discipline': 'Total', 'SQ Count': city_submittal_sheet_2_setup_table_1['SQ Count'].sum()}])
+        city_submittal_sheet_2_setup_table_1 = pd.concat([city_submittal_sheet_2_setup_table_1, total_df], ignore_index=True)
+        
+        #Table #2
+        city_submittal_sheet_2_setup_table_2= pd.DataFrame({
+            'Category of Change':[
+                'Minor Change (not a significant change to design intent)', 
+                'Urgent/Unforeseen Change (in-progress construct. activities)', 
+                'Major Change (significant change - requires City review)'], 
+            'SQ Count':[0,0,0], 
+            'Incorporated in Design':[0,0,0], 
+            'Not Incorporated in Design':[0,0,0], 
+            'Partially Incorporated in Design':[0,0,0], 
+            'Field Redline':[0,0,0]})
+        
+        def sheet_2_class_of_change_count(row, num):
+            if row['Class of Change'] == 'Incorporated in Design':
+                city_submittal_sheet_2_setup_table_2.loc[num, 'Incorporated in Design'] += 1
+            if row['Class of Change'] in ['Not Incorporated in Design', 'Field Redline, Not Incorporated in Design']:
+                city_submittal_sheet_2_setup_table_2.loc[num, 'Not Incorporated in Design'] += 1
+            if row['Class of Change'] == 'Partially Incorporated in Design':
+                city_submittal_sheet_2_setup_table_2.loc[num, 'Partially Incorporated in Design'] += 1
+            if row['Class of Change'] in ['Field Redline', 'Field Redline, Incorporated in Design']:  
+                city_submittal_sheet_2_setup_table_2.loc[num, 'Field Redline'] += 1
+        
+        for index, row in city_submittal_sheet_1_formated_sqs_added.iterrows():
+            if row['Status'] == 'Closed':
+                if row['Category of Change'] == 'Minor Change (not a significant change to design intent)':
+                    city_submittal_sheet_2_setup_table_2.loc[0, 'SQ Count'] += 1 
+                    sheet_1_row_num = 0
+                    sheet_2_class_of_change_count(row, sheet_1_row_num)
+
+                elif row['Category of Change'] == 'Urgent/Unforeseen Change (in-progress construct. activities)':
+                    city_submittal_sheet_2_setup_table_2.loc[1, 'SQ Count'] += 1 
+                    sheet_1_row_num = 1
+                    sheet_2_class_of_change_count(row, sheet_1_row_num)
+
+                elif row['Category of Change'] == 'Major Change (significant change - requires City review)':
+                    city_submittal_sheet_2_setup_table_2.loc[2, 'SQ Count'] += 1 
+                    sheet_1_row_num = 2
+                    sheet_2_class_of_change_count(row, sheet_1_row_num)
+
+
+        
+        sq_count_sum = city_submittal_sheet_2_setup_table_2['SQ Count'].sum()
+        incorporated_in_desing_sum = city_submittal_sheet_2_setup_table_2['Incorporated in Design'].sum()
+        not_incorporated_in_design_sum = city_submittal_sheet_2_setup_table_2['Not Incorporated in Design'].sum()
+        partially_incorporated_in_design_sum = city_submittal_sheet_2_setup_table_2['Partially Incorporated in Design'].sum()
+        field_redline_sum = city_submittal_sheet_2_setup_table_2['Field Redline'].sum()
+
+        total_df = pd.DataFrame([{'Category of Change': 'Total', 'SQ Count': sq_count_sum, 'Incorporated in Design': incorporated_in_desing_sum, 'Not Incorporated in Design':not_incorporated_in_design_sum, 'Partially Incorporated in Design': partially_incorporated_in_design_sum, 'Field Redline': field_redline_sum}])
+        city_submittal_sheet_2_setup_table_2 = pd.concat([city_submittal_sheet_2_setup_table_2, total_df], ignore_index=True)
+
+        friday_date, _ = str(self.upcoming_friday()).split(' ', maxsplit= 1)
+        dataframes_with_sheet_1_info = [(city_submittal_sheet_1, f'Batch#{self.new_batch_number}')]
+        dataframes_with_sheet_2_info = [(city_submittal_sheet_2_setup_table_1, friday_date), (city_submittal_sheet_2_setup_table_2, friday_date)]
+        dataframes_with_sheet_4_info = [(city_submittal_sheet_4, 'Summary-Design Package Tracker')]
+        self.write_to_excel('data/City Submittal.xlsx', dataframes_with_sheet_1_info, dataframes_with_sheet_2_info, dataframes_with_sheet_4_info)
+
+    def write_to_excel(self, file_path, dataframes_for_sheet_1, dataframes_for_sheet_2, dataframes_for_sheet_4):
         #Initialize the ExcelWriter once
         with pd.ExcelWriter(file_path, engine='xlsxwriter') as writer:
             #Call the sheet formatting and writing functions
             self.format_sheet_1_final_export(writer, dataframes_for_sheet_1)
+            self.format_sheet_2_final_export(writer, dataframes_for_sheet_2)
             self.format_sheet_4_final_export(writer, dataframes_for_sheet_4)
 
     def format_sheet_1_final_export(self, writer, dataframes_with_sheet_names):
+            
             # Access the workbook and configure it
             workbook = writer.book
             workbook.nan_inf_to_errors = True
@@ -579,6 +654,65 @@ class Excel_Manipulation():
                     writer.sheets[sheet_name].autofilter(0, 0, max_row, max_col - 1)
                     writer.sheets[sheet_name].freeze_panes(1, 0)
 
+    def format_sheet_2_final_export(self, writer, dataframes_with_sheet_names):
+        df1, sheet_name1 = dataframes_with_sheet_names[0]
+        df2, sheet_name2 = dataframes_with_sheet_names[1]
+
+        # Access the workbook
+        workbook = writer.book
+        worksheet = workbook.add_worksheet(name=sheet_name1)  # Assuming both DataFrames go to the same named sheet
+
+        # Define a base format for headers, similar to your existing format
+        header_format = workbook.add_format({
+            'font_size': 10,
+            'bold': True,
+            'text_wrap': True,
+            'valign': 'vcenter',
+            'align': 'center',
+            'border': 1})
+        merged_format = workbook.add_format({
+            'font_size': 10,
+            'bold': True,
+            'text_wrap': True,
+            'valign': 'vcenter',
+            'align': 'center',
+            'border': 1})
+        cell_format = workbook.add_format({
+            'font_size': 10,
+            'bold': True,
+            'text_wrap': True,
+            'valign': 'vcenter',
+            'align': 'center',
+            'border': 1})
+
+        worksheet.merge_range('C25:F25', 'Class of Change', merged_format)
+        # Function to write a DataFrame to a specified starting row
+        def write_dataframe(worksheet, dataframe, start_row):
+            # Write the headers
+            for col_num, value in enumerate(dataframe.columns.values):
+                worksheet.write(start_row, col_num, value, header_format)
+
+            if value in ['Discipline']:
+                worksheet.set_column(col_num, col_num, 52)  
+            elif value in ['SQ Count']:
+                worksheet.set_column(col_num, col_num, 10)
+            elif value in ['Field Redline', 'Incorporated in Design', 'Not Incorporated in Design', 'Partially Incorporated in Design']:
+                worksheet.set_column(col_num, col_num, 27)
+            
+            # Write the data
+            for row_num, row in enumerate(dataframe.values, start=start_row + 1):
+                for col_num, cell in enumerate(row):
+                    worksheet.write(row_num, col_num, cell, cell_format)  # Add formatting as needed
+
+        # Write the first DataFrame
+        write_dataframe(worksheet, df1, 0)  # Starting from row 0
+
+        # Calculate the starting row for the second DataFrame (df1's rows + 2 for spacing)
+        start_row_df2 = len(df1) + 2  # +2 for spacing
+
+        # Write the second DataFrame
+        write_dataframe(worksheet, df2, start_row_df2)
+
     def format_sheet_4_final_export(self, writer, dataframes_with_sheet_names):
             # Access the workbook and configure it
             workbook = writer.book
@@ -660,7 +794,7 @@ class Excel_Manipulation():
     def find_header(temp_df, excel_file):
         header_row = None
         for i, row in temp_df.iterrows():
-            if row.str.contains('Document No').any():
+            if (row == 'Document No').any():
                 header_row = i
                 break
         if header_row is not None:
