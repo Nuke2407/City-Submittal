@@ -19,16 +19,23 @@ def load_state(app_instance):
             if state.get("sqmetadata_uploaded", False):
                 app_instance.upload_button_sqmetadata.configure(state="disabled", text="Previous SQ Log Uploaded")
 
+            if state.get("sqmetadata_uploaded", False) and state.get("exportdocs_uploaded", False):
+                app_instance.process_files_button.configure(state="normal")
+                
             #If the tables were displayed, recreate it (assuming you have the data available)
-            if state.get("table_displayed", False):
+            if state.get("table_displayed_step_1", False):
                 create_missing_incorrect_data_table_stage_1(app_instance, 'data/missing_incorrect_metadata_file.xlsx')
                 create_new_SQ_batch_table(app_instance, 'data/new_city_sub_SQs.xlsx')
                 app_instance.upload_Stage_2_button_exportdocs.configure(state="normal", text="Upload The Export Document - ExportDocs_Stage_2.xls")
 
             #If the stage 2 table was displayed, recreate it (assuming you have the data available)
-            if state.get("table_displayed_stage_2", False):
+            if state.get("table_displayed_step_2", False):
                 create_missing_incorrect_data_table_stage_2(app_instance, 'data/missing_incorrect_metadata_file_2.xlsx')
                 app_instance.sq_removal_ui_creation()
+            
+            #If the final city submital stage 2 table was displayed, recreate it (assuming you have the data available)
+            if state.get("table_displayed_city_submittal_step_2", False):
+                create_city_submittal_final_document_data_table_stage_2(app_instance, 'data/City Submittal.xlsx')
 
     except FileNotFoundError as e:
         if str(e).find('table_data.json') != -1:
@@ -61,10 +68,7 @@ def on_closing(app_instance):
         current_step = "Step One"
     elif app_instance.step_two_frame.winfo_ismapped():
         current_step = "Step Two"
-    elif app_instance.step_three_frame.winfo_ismapped():
-        current_step = "Step Three"
 
-    
     save_state(app_instance, current_step)
 
     app_instance.destroy()
@@ -73,16 +77,18 @@ def save_state(app_instance, step_name):
     #Ensure that the 'table' attribute exists and is a widget before checking if it is mapp_instanceed
     table_missing_incorrect_data_table = app_instance.missing_incorrect_data_table is not None and isinstance(app_instance.missing_incorrect_data_table, ttk.Treeview) 
     table_SQs_to_send_data_table = app_instance.SQs_to_send_data_table is not None and isinstance(app_instance.SQs_to_send_data_table, ttk.Treeview)
-    table_missing_incorrect_data_table_stage_2 = app_instance.missing_incorrect_data_table_stage_2 is not None and isinstance(app_instance.missing_incorrect_data_table_stage_2, ttk.Treeview)
-    table_displayed = table_missing_incorrect_data_table and table_SQs_to_send_data_table
-    table_displayed_stage_2 = table_missing_incorrect_data_table_stage_2
+    table_missing_incorrect_data_displayed_step_2 = app_instance.missing_incorrect_data_table_stage_2 is not None and isinstance(app_instance.missing_incorrect_data_table_stage_2, ttk.Treeview)
+    table_missing_incorrect_data_city_submittal_displayed_step_2 = app_instance.city_submittal_data_table_stage_2 is not None and isinstance(app_instance.city_submittal_data_table_stage_2, ttk.Treeview)
+
+    table_displayed_step_1 = table_missing_incorrect_data_table and table_SQs_to_send_data_table
 
     state = {
         "current_step": step_name,
         "exportdocs_uploaded": app_instance.upload_Stage_1_button_exportdocs.cget("state") == "disabled",
         "sqmetadata_uploaded": app_instance.upload_button_sqmetadata.cget("state") == "disabled",
-        "table_displayed": table_displayed,
-        "table_displayed_stage_2": table_displayed_stage_2}
+        "table_displayed_step_1": table_displayed_step_1,
+        "table_displayed_step_2": table_missing_incorrect_data_displayed_step_2,
+        "table_displayed_city_submittal_step_2": table_missing_incorrect_data_city_submittal_displayed_step_2}
     
     with open("save_data/app_instance_state.json", "w") as file:
         json.dump(state, file)

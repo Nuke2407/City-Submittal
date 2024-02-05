@@ -42,7 +42,7 @@ def create_missing_incorrect_data_table_stage_1(self, excel_file_path):
     self.missing_incorrect_data_table_frame.grid_columnconfigure(0, weight=1)
     
     #Create a description for the table 
-    self.missing_incorrect_data_table_description = customtkinter.CTkLabel(self.missing_incorrect_data_table_frame, text="The SQs displayed below have missing metadata. Please update in Aconex.",
+    self.missing_incorrect_data_table_description = customtkinter.CTkLabel(self.missing_incorrect_data_table_frame, text="The Site Querys(SQs) displayed below have missing/incorrect metadata. Please update in Aconex.",
                                                     font=customtkinter.CTkFont(size=15))
     self.missing_incorrect_data_table_description.grid(row=0, column=0, sticky='n')
 
@@ -57,7 +57,7 @@ def create_missing_incorrect_data_table_stage_1(self, excel_file_path):
     self.missing_incorrect_data_table.configure(yscrollcommand=scrollbar.set)
 
     #Download Button for the Excel file.
-    self.download_missing_metadata_file_button = customtkinter.CTkButton(self.missing_incorrect_data_table_frame, text="Download Missing Metadata Excel File", command=download_missing_incorrect_data_table)
+    self.download_missing_metadata_file_button = customtkinter.CTkButton(self.missing_incorrect_data_table_frame, text="Download Missing/Incorrect Metadata Excel File", command=lambda: download_excel_document_function('data/missing_incorrect_metadata_file.xlsx'))
     self.download_missing_metadata_file_button.grid(row=2, column=0, padx=20, pady=10)
 
     #Dropdown menu to select the sheet.
@@ -109,7 +109,7 @@ def create_new_SQ_batch_table(self, excel_file_path):
     self.SQs_to_send_data_table_frame.grid_columnconfigure(0, weight=1)
     
     #Create a description for the table 
-    self.SQs_to_send_data_table_description = customtkinter.CTkLabel(self.SQs_to_send_data_table_frame, text="The SQs displayed below will be sent to the City in this batch. Check to see if the metadata matches the PDF file.",
+    self.SQs_to_send_data_table_description = customtkinter.CTkLabel(self.SQs_to_send_data_table_frame, text="The Site Querys(SQs) displayed below will be sent to the City in this batch. Check to see if the metadata matches the PDF file.",
                                                     font=customtkinter.CTkFont(size=15))
     self.SQs_to_send_data_table_description.grid(row=0, column=0, sticky='n')
 
@@ -124,7 +124,7 @@ def create_new_SQ_batch_table(self, excel_file_path):
     self.SQs_to_send_data_table.configure(yscrollcommand=scrollbar.set)
 
     #Download Button for the Excel file.
-    self.download_missing_metadata_file_button = customtkinter.CTkButton(self.SQs_to_send_data_table_frame, text="Download SQ Checklist Excel File", command=download_SQs_to_send_file)
+    self.download_missing_metadata_file_button = customtkinter.CTkButton(self.SQs_to_send_data_table_frame, text="Download SQ Checklist Excel File", command=lambda: download_excel_document_function('data/new_city_sub_SQs.xlsx'))
     self.download_missing_metadata_file_button.grid(row=2, column=0, padx=20, pady=10)
 
     #Dropdown menu to select the sheet.
@@ -176,7 +176,7 @@ def create_missing_incorrect_data_table_stage_2(self, excel_file_path):
     self.missing_incorrect_data_table_stage_2_frame.grid_columnconfigure(0, weight=1)
 
     #Create a description for the table 
-    self.missing_incorrect_data_table_stage_2_description = customtkinter.CTkLabel(self.missing_incorrect_data_table_stage_2_frame, text="The SQs displayed below have missing metadata. Please update in Aconex.",
+    self.missing_incorrect_data_table_stage_2_description = customtkinter.CTkLabel(self.missing_incorrect_data_table_stage_2_frame, text="The Site Querys(SQs) displayed below have missing metadata. Please update in Aconex.",
                                                     font=customtkinter.CTkFont(size=15))
     self.missing_incorrect_data_table_stage_2_description.grid(row=0, column=0, sticky='n')
 
@@ -191,7 +191,7 @@ def create_missing_incorrect_data_table_stage_2(self, excel_file_path):
     self.missing_incorrect_data_table_stage_2.configure(yscrollcommand=scrollbar.set)
 
     #Download Button for the Excel file.
-    self.download_missing_metadata_file_button_stage_2 = customtkinter.CTkButton(self.missing_incorrect_data_table_stage_2_frame, text="Download Missing Metadata Excel File", command=download_missing_incorrect_data_table_stage_2)
+    self.download_missing_metadata_file_button_stage_2 = customtkinter.CTkButton(self.missing_incorrect_data_table_stage_2_frame, text="Download Missing/Incorrect Metadata Excel File", command=lambda: download_excel_document_function('data/missing_incorrect_metadata_file_2.xlsx'))
     self.download_missing_metadata_file_button_stage_2.grid(row=2, column=0, padx=20, pady=10)
 
     #Dropdown menu to select the sheet.
@@ -206,48 +206,78 @@ def create_missing_incorrect_data_table_stage_2(self, excel_file_path):
     if sheet_names_stage_2:
         update_table(sheet_names_stage_2[0])
 
-def download_missing_incorrect_data_table():
-    try:
-        #Assuming the file is saved in the 'data' directory
-        source_file = 'data/missing_incorrect_metadata_file.xlsx'
-        if os.path.exists(source_file):
-            # Ask the user where to save the file
-            filetypes = [('Excel File', '*.xlsx'), ('All Files', '*.*')]
-            dest_file = filedialog.asksaveasfilename(defaultextension=".xlsx", filetypes=filetypes, title="Save File As")
-            # If the user selects a location, copy the file
-            if dest_file:
-                shutil.copy(source_file, dest_file)             
-            else:
-                messagebox.showinfo("Download Cancelled", "Download operation was cancelled.")
-        else:
-            messagebox.showerror("Download Failed", "The source file does not exist.")
-    
-    except Exception as e:
-        messagebox.showerror("Error", f"An error occurred: {e}")
+def create_city_submittal_final_document_data_table_stage_2(self, excel_file_path):
 
-def download_SQs_to_send_file():
-    try:
-        #Assuming the file is saved in the 'data' directory
-        source_file = 'data/new_city_sub_SQs.xlsx'
-        if os.path.exists(source_file):
-            # Ask the user where to save the file
-            filetypes = [('Excel File', '*.xlsx'), ('All Files', '*.*')]
-            dest_file = filedialog.asksaveasfilename(defaultextension=".xlsx", filetypes=filetypes, title="Save File As")
-            # If the user selects a location, copy the file
-            if dest_file:
-                shutil.copy(source_file, dest_file)             
-            else:
-                messagebox.showinfo("Download Cancelled", "Download operation was cancelled.")
-        else:
-            messagebox.showerror("Download Failed", "The source file does not exist.")
-    
-    except Exception as e:
-        messagebox.showerror("Error", f"An error occurred: {e}")
+    #Read Excel file into a dictionary of city_submittal_DataFrame_stage_2s - 'sheet_name=None' reads all sheets in the file.
+    city_submittal_stage_2 = pd.read_excel(excel_file_path, sheet_name=None)
 
-def download_missing_incorrect_data_table_stage_2():
+    #city_submittalize city_submittal_Dataframe_stage_2.
+    city_submittal_sheet_name_stage_2 = next(iter(city_submittal_stage_2))
+    city_submittal_dataframe_stage_2 = city_submittal_stage_2[city_submittal_sheet_name_stage_2]
+
+    #Function to update the table with the selected sheet.
+    def update_table(sheet_name):
+        city_submittal_dataframe_stage_2 = city_submittal_stage_2[sheet_name]
+
+        #Simplified column names for Treeeview 
+        simplified_columns = [col.replace('?', '').replace('(', '').replace(')', '').replace('/', '_').replace(' ', '_') for col in city_submittal_dataframe_stage_2.columns]
+
+        #clear the existing table data and columns.
+        self.city_submittal_data_table_stage_2.delete(*self.city_submittal_data_table_stage_2.get_children())
+        self.city_submittal_data_table_stage_2['columns'] = simplified_columns
+
+        #Create new columns based on the current city_submittal_dataframe_stage_2
+        for col, simplified_col_name in zip(city_submittal_dataframe_stage_2.columns, simplified_columns):
+            self.city_submittal_data_table_stage_2.heading(simplified_col_name, text=col)
+            self.city_submittal_data_table_stage_2.column(simplified_col_name, anchor="center")
+
+        #Insert new data.
+        for _, row in city_submittal_dataframe_stage_2.iterrows():
+            values = [row[col] for col in city_submittal_dataframe_stage_2.columns]
+            self.city_submittal_data_table_stage_2.insert("", "end", values=values)
+
+    #Create a frame for table and description
+    self.city_submittal_data_table_stage_2_frame = customtkinter.CTkFrame(self.step_two_frame, corner_radius=0)
+    self.city_submittal_data_table_stage_2_frame.grid(row=6, column=0, padx=20, pady=10, sticky='new')
+    self.city_submittal_data_table_stage_2_frame.grid_rowconfigure(1, weight=1) 
+    self.city_submittal_data_table_stage_2_frame.grid_columnconfigure(0, weight=1)
+
+    #Create a description for the table 
+    self.city_submittal_data_table_stage_2_description = customtkinter.CTkLabel(self.city_submittal_data_table_stage_2_frame, text="The table displayed below shows the unformated City Submittal document.",
+                                                    font=customtkinter.CTkFont(size=15))
+    self.city_submittal_data_table_stage_2_description.grid(row=0, column=0, sticky='n')
+
+    #Simplify column names and create the Treeview widget
+    simplified_columns = [col.replace('?', '').replace('(', '').replace(')', '').replace('/', '_').replace(' ', '_') for col in city_submittal_dataframe_stage_2.columns]
+    self.city_submittal_data_table_stage_2 = ttk.Treeview(self.city_submittal_data_table_stage_2_frame, columns=simplified_columns, show='headings')
+    self.city_submittal_data_table_stage_2.grid(row=1, column=0, padx=20, pady=10, sticky='nsew')
+
+    #Create and place a vertical scrollbar
+    scrollbar = ttk.Scrollbar(self.city_submittal_data_table_stage_2_frame, orient="vertical", command=self.city_submittal_data_table_stage_2.yview)
+    scrollbar.grid(row=1, column=1, sticky='ns')
+    self.city_submittal_data_table_stage_2.configure(yscrollcommand=scrollbar.set)
+
+    #Download Button for the Excel file.
+    self.download_missing_metadata_file_button_stage_2 = customtkinter.CTkButton(self.city_submittal_data_table_stage_2_frame, text="Download Final City Submittal Excel Sheet", command=lambda: download_excel_document_function('data/City Submittal.xlsx'))
+    self.download_missing_metadata_file_button_stage_2.grid(row=2, column=0, padx=20, pady=10)
+
+    #Dropdown menu to select the sheet.
+    sheet_names_city_submittal_stage_2 = list(city_submittal_stage_2.keys())
+    city_submittal_first_sheet = customtkinter.StringVar(value=city_submittal_sheet_name_stage_2)
+    city_submittal_sheet_selector = customtkinter.CTkOptionMenu(self.city_submittal_data_table_stage_2_frame, values=sheet_names_city_submittal_stage_2, variable=city_submittal_first_sheet, command=update_table, corner_radius=0)
+    city_submittal_sheet_selector.grid(row=2, column=0, sticky='wn', padx=20, pady=0)
+
+    #Insert data into the table
+    update_table(city_submittal_sheet_name_stage_2)
+
+    if sheet_names_city_submittal_stage_2:
+        update_table(sheet_names_city_submittal_stage_2[0])
+
+def download_excel_document_function(file_path):
+
     try:
         #Assuming the file is saved in the 'data' directory
-        source_file = 'data/missing_incorrect_metadata_file_2.xlsx'
+        source_file = file_path
         if os.path.exists(source_file):
             # Ask the user where to save the file
             filetypes = [('Excel File', '*.xlsx'), ('All Files', '*.*')]
@@ -255,8 +285,6 @@ def download_missing_incorrect_data_table_stage_2():
             # If the user selects a location, copy the file
             if dest_file:
                 shutil.copy(source_file, dest_file)             
-            else:
-                messagebox.showinfo("Download Cancelled", "Download operation was cancelled.")
         else:
             messagebox.showerror("Download Failed", "The source file does not exist.")
     

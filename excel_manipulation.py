@@ -4,7 +4,7 @@ import os
 from tkinter import messagebox
 import re
 from datetime import datetime, timedelta
-
+import warnings
 
 class Excel_Manipulation():
     def stage_1(self):
@@ -24,9 +24,9 @@ class Excel_Manipulation():
         self.format_and_save_excel(incorrect_missing_df_sheet_names, 'data/missing_incorrect_metadata_file.xlsx')
 
     def import_manupulate_data(self):
-        excel_file_1 = 'stage_one_documents/SQ_metadata_closed_template.xlsx'
+        excel_file_1 = 'data/permanent/SQ_metadata_closed_template.xlsx'
         excel_file_2 = 'stage_one_documents/VLW-LOG-11000050-DC-0001_SQ_old.xls'
-        excel_file_3 = 'stage_one_documents/ExportDocs_Stage_1.xls'
+        excel_file_3 = 'stage_one_documents/ExportDocs_Step_1.xls'
 
         #Reads the excel file and stores the datat in rows. The 'header=' sets the header to the 12th excel column.
         self.SQ_metadata_closed_file = pd.read_excel(excel_file_1, header=0)
@@ -103,13 +103,12 @@ class Excel_Manipulation():
     def incorrect_metadata_check(df_file):
         #Creates a new row where the Design Package, Incorporated To, and Specifications are split up and converted into lists for better comparison.
         incorrect_metadata_file = df_file.copy()
-        pattern_combined = r'(VLW-.*?)(?=, VLW-|$)'
-        incorrect_metadata_file['Design Package Split Up'] = incorrect_metadata_file['Design Package'].str.extractall(pattern_combined)[0].groupby(level=0).apply(list)
-        incorrect_metadata_file['Specs Split Up'] = incorrect_metadata_file['Specifications'].str.extractall(pattern_combined)[0].groupby(level=0).apply(list)
-        incorrect_metadata_file['Incorporated Design Package Split Up'] = incorrect_metadata_file['Incorporated To'].str.extractall(pattern_combined)[0].groupby(level=0).apply(list)
-
+        pattern_combined = re.compile(r'(VLW-.*?)(?=, VLW-|$)')
+        incorrect_metadata_file['Design Package Split Up'] = incorrect_metadata_file['Design Package'].apply(lambda x: pattern_combined.findall(x) if pd.notna(x) else '')
+        incorrect_metadata_file['Specs Split Up'] = incorrect_metadata_file['Specifications'].apply(lambda x: pattern_combined.findall(x) if pd.notna(x) else '')
+        incorrect_metadata_file['Incorporated Design Package Split Up'] = incorrect_metadata_file['Incorporated To'].apply(lambda x: pattern_combined.findall(x) if pd.notna(x) else '')
         incorrect_row = []
-        
+
         #Iterating over the entire row to check the if the metadata has been fillout correctly.
         for index, row in incorrect_metadata_file.iterrows():
             #Checking completeness of the metadata associated with the Class of Change. 
@@ -198,7 +197,7 @@ class Excel_Manipulation():
                 incorrect_row.append(new_row)
 
         incorrect_metadata_file = pd.DataFrame(incorrect_row)
-        incorrect_metadata_file = incorrect_metadata_file[['Document No', 'Title', 'Design Directive', 'Class of Change', 'Category of Change', 
+        incorrect_metadata_file = incorrect_metadata_file[['Document No', 'Title', 'Discipline', 'Category of Change', 'Design Directive', 'Class of Change', 
                                                             'Reason for Change', 'Design Package', 'Specifications', 'Incorporated To', 'Error Type']]
         
         return incorrect_metadata_file
@@ -215,7 +214,7 @@ class Excel_Manipulation():
                 'bold': True,
                 'text_wrap': True,
                 'valign': 'top',
-                'fg_color': '#0EC5D8',
+                'fg_color': '#1BF9F9',
                 'border': 1
             })
 
@@ -227,9 +226,15 @@ class Excel_Manipulation():
                 # Write the column headers with the defined format
                 for col_num, value in enumerate(dataframe.columns.values):
                     worksheet.write(0, col_num, value, header_format)
-                    # Set column width based on the maximum length of the content in each column
-                    column_len = max(dataframe[value].astype(str).map(len).max(), len(value))
-                    worksheet.set_column(col_num, col_num, column_len)
+
+                    if value in ['Design Package', 'Incorporated To', 'Specifications', 'Title', 'Category of Change', 'Error Type']:
+                        worksheet.set_column(col_num, col_num, 54)  
+                    elif value in ['Reason for Change']:
+                        worksheet.set_column(col_num, col_num, 41)                        
+                    elif value in ['Document No', 'Design Directive', 'Class of Change']:
+                        worksheet.set_column(col_num, col_num, 25)
+                    elif value in ['Discipline']:
+                        worksheet.set_column(col_num, col_num, 23)
 
                 # Apply the cell format to each cell in the data
                 for row_num in range(1, len(dataframe) + 1):
@@ -246,13 +251,16 @@ class Excel_Manipulation():
                 dataframe.to_excel(writer, sheet_name=sheet_name, index=False)
                 # Apply formatting to each worksheet
                 format_worksheet(writer.sheets[sheet_name], dataframe)
-        
+                (max_row, max_col) = dataframe.shape
+                writer.sheets[sheet_name].autofilter(0, 0, max_row, max_col - 1)
+                writer.sheets[sheet_name].freeze_panes(1, 0)
+
     def stage_2_part_1(self):
-        excel_file_4 = 'stage_one_documents/ExportDocs_Stage_2.xls' 
+        excel_file_4 = 'stage_one_documents/ExportDocs_Step_2.xls' 
         temp_df_2 = pd.read_excel(excel_file_4, header=None)
         exportDocs_2 = Excel_Manipulation.find_header(temp_df_2, excel_file_4)
 
-        excel_file_2 = 'stage_one_documents/ExportDocs_Stage_1.xls' 
+        excel_file_2 = 'stage_one_documents/ExportDocs_Step_1.xls' 
         temp_df = pd.read_excel(excel_file_2, header=None)
         exportDocs_1 = Excel_Manipulation.find_header(temp_df, excel_file_2)
 
@@ -277,15 +285,9 @@ class Excel_Manipulation():
         missing_metadata_file_2 = Excel_Manipulation.missing_metadata_check(SQ_metadata_closed_df_stage_2_sorted)
         incorrect_metadata_file_stage_2 = Excel_Manipulation.incorrect_metadata_check(SQ_metadata_closed_df_stage_2_sorted)
 
-        #Create a downloadable version of the row that contains both the incorrect and missing metadata. 
-        with pd.ExcelWriter('data/missing_incorrect_metadata_file_2.xlsx') as writer:
-            missing_metadata_file_2.to_excel(writer, sheet_name='SQs With Missing Data 2', index=False)
-            incorrect_metadata_file_stage_2.to_excel(writer, sheet_name='SQs With Incorrect Data 2', index=False)
-            exportDocs_1_filtered_to_add.to_excel(writer, sheet_name='test', index=False)
-
         incorrect_missing_df_sheet_names_stage_2 = [(missing_metadata_file_2, 'SQs With Missing Data 2'), (incorrect_metadata_file_stage_2, 'SQs With Incorrect Data 2')]
 
-        #Format the Excel file
+        #Format and create the Excel file
         self.format_and_save_excel(incorrect_missing_df_sheet_names_stage_2, 'data/missing_incorrect_metadata_file_2.xlsx')
 
     def stage_2_part_2(self):
@@ -329,13 +331,11 @@ class Excel_Manipulation():
         final_export_df_FCD_only = final_export_df_FCD_only.apply(update_rows, axis=1)
         city_submittal_sheet_1_formated = final_export_df_FCD_only[['Document No', 'Revision', 'Title', 'Discipline', 'Design Package(s)', 'Design Package(s) - Not Incorporated to', 'Design Package(s) - Incorporated To', 'Specifications', 'Category of Change', 'Revision Date',	'Design Directive', 'Status', 'Class of Change', 'Batch #',	'Previous Batch #', 'Comment']]
 
-
-        #Add SQs that are now open from the previous log exclusing the superseded 'Cancelled' ones. 
+        #Add SQs that are now open from the previous log excluding the superseded 'Cancelled' ones. 
         new_log_identifiers = city_submittal_sheet_1_formated['Document No']
         sqs_to_add_back = VLW_LOG_11000050_DC_0001_SQ_old[~VLW_LOG_11000050_DC_0001_SQ_old['Document No'].isin(new_log_identifiers)]
         closed_sqs_to_add_back = sqs_to_add_back[sqs_to_add_back['Status'].str.contains('Closed')].copy()
         city_submittal_sheet_1_formated_sqs_added = pd.concat([city_submittal_sheet_1_formated, closed_sqs_to_add_back])
-
 
         excel_file_7 = 'data/new_city_sub_SQs.xlsx'
         if os.path.exists(excel_file_7):
@@ -353,30 +353,30 @@ class Excel_Manipulation():
             sqs_on_hold_df = pd.read_excel(excel_file_6, sheet_name='SQs on hold', header=0)
             sqs_to_supersed_df = pd.read_excel(excel_file_6, sheet_name='SQs to supersed', header=0)
             if not sqs_on_hold_df.empty:
-                sqs_to_delete = sqs_on_hold_df['Document No'].to_list()
+                sqs_to_delete = sqs_on_hold_df['Document Number'].to_list()
                 city_submittal_sheet_1_formated_on_hold_sqs_removed = city_submittal_sheet_1_formated_sqs_added[~city_submittal_sheet_1_formated_sqs_added['Document No'].isin(sqs_to_delete)]
                 sqs_to_add_back_2 = VLW_LOG_11000050_DC_0001_SQ_old[VLW_LOG_11000050_DC_0001_SQ_old['Document No'].isin(sqs_to_delete)]
                 city_submittal_sheet_1_formated_sqs_added = pd.concat([city_submittal_sheet_1_formated_on_hold_sqs_removed, sqs_to_add_back_2])
             if not sqs_to_supersed_df.empty:
                 for index, row in sqs_to_supersed_df.iterrows(): 
-                    superseding_sq_number = row['Document No of superseding SQ'][-4:]
-                    superseding_sq_revision_number = str(row['Revision No of superseding SQ'])[-1:]
-                    city_submittal_sheet_1_formated_sqs_added.loc[city_submittal_sheet_1_formated_sqs_added['Document No'] == row['Document No'], 'Comment'] = f"This SQ is obsolete and superseded by SQ-{superseding_sq_number} REV 0{superseding_sq_revision_number}. It will be permanently deleted starting from City Submittal #{self.new_batch_number + 1}"
-                    city_submittal_sheet_1_formated_sqs_added.loc[city_submittal_sheet_1_formated_sqs_added['Document No'] == row['Document No'], 'Status'] = 'Cancelled'
-                    city_submittal_sheet_1_formated_sqs_added.loc[city_submittal_sheet_1_formated_sqs_added['Document No'] == row['Document No'], 'Previous Batch #'] = city_submittal_sheet_1_formated_sqs_added.loc[city_submittal_sheet_1_formated_sqs_added['Document No'] == row['Document No'], 'Batch #']
-                    city_submittal_sheet_1_formated_sqs_added.loc[city_submittal_sheet_1_formated_sqs_added['Document No'] == row['Document No'], 'Batch #'] = self.new_batch_number
+                    superseding_sq_number = row['Document Number of superseding SQ'][-4:]
+                    superseding_sq_revision_number = str(row['Revision Number of superseding SQ'])[-1:]
+                    city_submittal_sheet_1_formated_sqs_added.loc[city_submittal_sheet_1_formated_sqs_added['Document No'] == row['Document Number of SQ being superseded'], 'Comment'] = f"This SQ is obsolete and superseded by SQ-{superseding_sq_number} REV 0{superseding_sq_revision_number}. It will be permanently deleted starting from City Submittal #{self.new_batch_number + 1}"
+                    city_submittal_sheet_1_formated_sqs_added.loc[city_submittal_sheet_1_formated_sqs_added['Document No'] == row['Document Number of SQ being superseded'], 'Status'] = 'Cancelled'
+                    city_submittal_sheet_1_formated_sqs_added.loc[city_submittal_sheet_1_formated_sqs_added['Document No'] == row['Document Number of SQ being superseded'], 'Previous Batch #'] = city_submittal_sheet_1_formated_sqs_added.loc[city_submittal_sheet_1_formated_sqs_added['Document No'] == row['Document Number of SQ being superseded'], 'Batch #']
+                    city_submittal_sheet_1_formated_sqs_added.loc[city_submittal_sheet_1_formated_sqs_added['Document No'] == row['Document Number of SQ being superseded'], 'Batch #'] = self.new_batch_number
 	
-        city_submittal_sheet_1 = city_submittal_sheet_1_formated_sqs_added.sort_values(by= 'Document No')
+        city_submittal_sheet_1 = city_submittal_sheet_1_formated_sqs_added.sort_values(by='Document No')
 
         #SHEET 4
         #=====================================================================================================================
 
         city_submittal_sheet_4_packages_organized = city_submittal_sheet_1_formated_sqs_added.copy()
-        pattern_combined = r'(VLW-.*?)(?=, VLW-|$)' 
-        city_submittal_sheet_4_packages_organized['Design Package Split Up'] = city_submittal_sheet_4_packages_organized['Design Package(s)'].str.extractall(pattern_combined)[0].groupby(level=0).apply(list)
-        city_submittal_sheet_4_packages_organized['DP Not Incorporated to Split Up'] = city_submittal_sheet_4_packages_organized['Design Package(s) - Not Incorporated to'].str.extractall(pattern_combined)[0].groupby(level=0).apply(list)
-        city_submittal_sheet_4_packages_organized['DP Incorporated To Split Up'] = city_submittal_sheet_4_packages_organized['Design Package(s) - Incorporated To'].str.extractall(pattern_combined)[0].groupby(level=0).apply(list)
-
+        pattern_combined = re.compile(r'(VLW-.*?)(?=, VLW-|$)')
+        # Use a lambda function with findall to get all matches in a list directly
+        city_submittal_sheet_4_packages_organized['Design Package Split Up'] = city_submittal_sheet_4_packages_organized['Design Package(s)'].apply(lambda x: pattern_combined.findall(str(x)))
+        city_submittal_sheet_4_packages_organized['DP Not Incorporated to Split Up'] = city_submittal_sheet_4_packages_organized['Design Package(s) - Not Incorporated to'].apply(lambda x: pattern_combined.findall(str(x)))
+        city_submittal_sheet_4_packages_organized['DP Incorporated To Split Up'] = city_submittal_sheet_4_packages_organized['Design Package(s) - Incorporated To'].apply(lambda x: pattern_combined.findall(str(x)))
         sheet_4_sort_df = city_submittal_sheet_4_packages_organized[['Design Package Split Up', 'DP Not Incorporated to Split Up', 'DP Incorporated To Split Up', 'Category of Change', 'Class of Change']]
 
         city_submittal_sheet_4 = pd.DataFrame(columns=['Design package number', 'Design Package Title', 'Field Redline', 'Incorporated in Design', 'Not Incorporated in Design', 'Major Change (significant change - requires City review)', 
@@ -406,6 +406,10 @@ class Excel_Manipulation():
 
                     match_index = city_submittal_sheet_4.index[city_submittal_sheet_4['Design package number'] == doc_num].tolist()
                     if row['Class of Change'] in ['Field Redline', 'Field Redline, Incorporated in Design', 'Incorporated in Design, Field Redline']:
+                        if doc_num == 'VLW-PKG-00000036-FC-0001':
+                            pd.DataFrame(row).to_excel('data/BUGSSSS.xlsx')
+                            print('BREAK')
+                            print(new_row)
                         city_submittal_sheet_4.at[match_index[0], 'Field Redline'] += 1
                     if row['Class of Change'] in ['Not Incorporated in Design', 'Partially Incorporated in Design', 'Field Redline, Not Incorporated in Design', 'Not Incorporated in Design, Field Redline']:
                         city_submittal_sheet_4.at[match_index[0], 'Not Incorporated in Design'] += 1
@@ -440,7 +444,7 @@ class Excel_Manipulation():
                         city_submittal_sheet_4.at[match_index[0], 'Incorporated in Design'] += 1
 
         city_submittal_sheet_4 = city_submittal_sheet_4.sort_values(by= 'Design package number')
-        
+
         #Sheet #2
         #=========================================================================================================================================================================================================
         
@@ -512,18 +516,58 @@ class Excel_Manipulation():
         total_df = pd.DataFrame([{'Category of Change': 'Total', 'SQ Count': sq_count_sum, 'Incorporated in Design': incorporated_in_desing_sum, 'Not Incorporated in Design':not_incorporated_in_design_sum, 'Partially Incorporated in Design': partially_incorporated_in_design_sum, 'Field Redline': field_redline_sum}])
         city_submittal_sheet_2_setup_table_2 = pd.concat([city_submittal_sheet_2_setup_table_2, total_df], ignore_index=True)
 
-        friday_date, _ = str(self.upcoming_friday()).split(' ', maxsplit= 1)
+        #Sheet #3
+        #=========================================================================================================================================================================================================
+        
+        #Ignore the 
+        warnings.filterwarnings(action='ignore', category=FutureWarning, 
+                        message=".*DataFrame concatenation with empty or all-NA entries is deprecated.*")
+
+        city_submittal_sheet_3 = pd.DataFrame(columns=['Design package number', 'Document No', 'Revision', 'Title', 'Discipline', 'Specifications', 'Category of Change',  'Revision Date', 'Design Directive', 'Status', 'Class of Change'])
+
+        for index, row in city_submittal_sheet_4_packages_organized.iterrows():
+            if row['Status'] != 'Closed':
+                continue
+            if isinstance(row['Design Package Split Up'], list) and row['Design Package Split Up']:
+                for doc_num_title in row['Design Package Split Up']:
+                    if doc_num_title.startswith("VLW-SPC") or doc_num_title.startswith("VLW-DNR"):
+                        continue 
+                    doc_num, doc_title = doc_num_title.split(' ', maxsplit=1)
+                    new_row = {
+                        'Design package number': doc_num,
+                        'Document No': row['Document No'],
+                        'Revision': row['Revision'],
+                        'Title': row['Title'],
+                        'Discipline': row['Discipline'],
+                        'Specifications': row['Specifications'],
+                        'Category of Change': row['Category of Change'],
+                        'Revision Date': row['Revision Date'],
+                        'Design Directive': row['Design Directive'],
+                        'Status': row['Status'],
+                        'Class of Change': row['Class of Change']}
+                    
+                    new_row_df = pd.DataFrame([new_row], columns=city_submittal_sheet_3.columns)
+                    city_submittal_sheet_3 = pd.concat([city_submittal_sheet_3, new_row_df], ignore_index=True)
+
+        city_submittal_sheet_3 = city_submittal_sheet_3.sort_values(by= 'Design package number')
+
+        friday_str = str(self.upcoming_friday())
+        friday_date = friday_str.split(' ', maxsplit=1)[0]  # Take the first part of the split
+        friday_date = 'Summary ' + friday_date  # Concatenate with 'Summary'
+        
         dataframes_with_sheet_1_info = [(city_submittal_sheet_1, f'Batch#{self.new_batch_number}')]
         dataframes_with_sheet_2_info = [(city_submittal_sheet_2_setup_table_1, friday_date), (city_submittal_sheet_2_setup_table_2, friday_date)]
         dataframes_with_sheet_4_info = [(city_submittal_sheet_4, 'Summary-Design Package Tracker')]
-        self.write_to_excel('data/City Submittal.xlsx', dataframes_with_sheet_1_info, dataframes_with_sheet_2_info, dataframes_with_sheet_4_info)
+        dataframes_with_sheet_3_info = [(city_submittal_sheet_3, 'Design Package Tracker')]
+        self.write_to_excel('data/City Submittal.xlsx', dataframes_with_sheet_1_info, dataframes_with_sheet_2_info, dataframes_with_sheet_4_info, dataframes_with_sheet_3_info)
 
-    def write_to_excel(self, file_path, dataframes_for_sheet_1, dataframes_for_sheet_2, dataframes_for_sheet_4):
+    def write_to_excel(self, file_path, dataframes_for_sheet_1, dataframes_for_sheet_2, dataframes_for_sheet_4, dataframes_for_sheet_3):
         #Initialize the ExcelWriter once
         with pd.ExcelWriter(file_path, engine='xlsxwriter') as writer:
             #Call the sheet formatting and writing functions
             self.format_sheet_1_final_export(writer, dataframes_for_sheet_1)
             self.format_sheet_2_final_export(writer, dataframes_for_sheet_2)
+            self.format_sheet_3_final_export(writer, dataframes_for_sheet_3)
             self.format_sheet_4_final_export(writer, dataframes_for_sheet_4)
 
     def format_sheet_1_final_export(self, writer, dataframes_with_sheet_names):
@@ -606,41 +650,35 @@ class Excel_Manipulation():
                 # Set row height to 69 pixels (approximately 51 points)
                 worksheet.set_default_row(80)
 
-                # Conditional formatting
-                previous_batch_col = None
-                comment_col = None
-                for col_num, column_name in enumerate(dataframe.columns):
-                    if column_name == 'Previous Batch #':
-                        previous_batch_col = col_num
-                    if column_name == 'Comment':
-                        comment_col = col_num
+                status_col_index = dataframe.columns.get_loc("Status") if "Status" in dataframe.columns else None
+                previous_batch_col_index = dataframe.columns.get_loc("Previous Batch #") if "Previous Batch #" in dataframe.columns else None
 
                 # Apply the cell format to each cell in the data
-                for row_num in range(1, len(dataframe) + 1):
+                for row_num in range(len(dataframe)):
+                    status_value = dataframe.iloc[row_num, status_col_index] if status_col_index is not None else ""
+                    previous_batch_value = dataframe.iloc[row_num, previous_batch_col_index] if previous_batch_col_index is not None else None
+
+                    # Loop through each column for the current row
                     for col_num, column_name in enumerate(dataframe.columns):
-                        cell_value = dataframe.iloc[row_num - 1, col_num]
-                        # Check for NaT values and replace with None
+                        cell_value = dataframe.iloc[row_num, col_num]
                         if pd.isna(cell_value):
-                            cell_value = None
-                        worksheet.write(row_num, col_num, cell_value, cell_format)
+                            cell_value = None  # Handle NaN and NaT
 
-                        if column_name == 'Revision Date' and cell_value is not None:
-                            worksheet.write(row_num, col_num, cell_value, date_format)
+                        # Determine the base format
+                        base_format = cell_format
+                        if column_name == 'Revision Date':
+                            base_format = date_format
+
+                        # Determine conditional formatting based on 'Status' and 'Previous Batch #'
+                        if status_value == 'Cancelled':
+                            format_to_use = red_format_date if column_name == 'Revision Date' else red_format
+                        elif status_value == 'Closed' and isinstance(previous_batch_value, int):
+                            format_to_use = yellow_format_date if column_name == 'Revision Date' else yellow_format
                         else:
-                            worksheet.write(row_num, col_num, cell_value, cell_format)
+                            format_to_use = base_format
 
-                        # Apply yellow highlight if 'Previous Batch #' has content
-                        if previous_batch_col is not None and dataframe.iloc[row_num - 1, previous_batch_col] and column_name == 'Revision Date':
-                            worksheet.write(row_num, col_num, cell_value, yellow_format_date)
-                        elif previous_batch_col is not None and dataframe.iloc[row_num - 1, previous_batch_col]:
-                            worksheet.write(row_num, col_num, cell_value, yellow_format)
-
-                        # Apply red highlight if 'Comment' has content
-                        if comment_col is not None and dataframe.iloc[row_num - 1, comment_col] and column_name == 'Revision Date':
-                            worksheet.write(row_num, col_num, cell_value, red_format_date)
-                        elif comment_col is not None and dataframe.iloc[row_num - 1, comment_col]:
-                            worksheet.write(row_num, col_num, cell_value, red_format)
-
+                        # Write the cell with the determined format
+                        worksheet.write(row_num + 1, col_num, cell_value, format_to_use)
 
             # Write each DataFrame to its respective sheet and apply formatti
             for dataframe, sheet_name in dataframes_with_sheet_names:
@@ -653,6 +691,89 @@ class Excel_Manipulation():
                     (max_row, max_col) = dataframe.shape
                     writer.sheets[sheet_name].autofilter(0, 0, max_row, max_col - 1)
                     writer.sheets[sheet_name].freeze_panes(1, 0)
+
+    def format_sheet_3_final_export(self, writer, dataframes_with_sheet_names):
+            
+            # Access the workbook and configure it
+            workbook = writer.book
+            workbook.nan_inf_to_errors = True
+
+            # Define a format for the header
+            header_format = workbook.add_format({
+                'font_size': 10,
+                'bold': True,
+                'text_wrap': True,
+                'valign': 'vcenter',
+                'align': 'center',
+                'font_color': '#00008B',
+                'border': 1})
+            # Define a format for the data cells with borders
+            cell_format = workbook.add_format({
+                'font_size': 10,
+                'text_wrap': True,
+                'valign': 'vcenter',
+                'align': 'center',
+                'border': 1,})
+            date_format = workbook.add_format({
+                'font_size': 10,
+                'text_wrap': True,
+                'valign': 'vcenter',
+                'align': 'center',
+                'border': 1,
+                'num_format': 'mm/dd/yyyy'})
+
+            # Function to apply formatting to a worksheet
+            def format_worksheet(worksheet, dataframe):
+                # Write the column headers with the defined format
+                for col_num, value in enumerate(dataframe.columns.values):
+                    worksheet.write(0, col_num, value, header_format)
+                    worksheet.set_zoom(70)
+
+                    # Set specific column widths
+                    if value in ['Title']:
+                        worksheet.set_column(col_num, col_num, 82)                     
+                    if value in ['Specifications', 'Class of Change', 'Category of Change']:
+                        worksheet.set_column(col_num, col_num, 54)  
+                    if value in ['Class of Change']:
+                        worksheet.set_column(col_num, col_num, 36)                         
+                    elif value in ['Design package number', 'Document No', 'Design Directive']:
+                        worksheet.set_column(col_num, col_num, 30)
+                    elif value in ['Discipline']:
+                        worksheet.set_column(col_num, col_num, 21)
+                    elif value in ['Revision Date']:
+                        worksheet.set_column(col_num, col_num, 17)
+                    elif value in ['Revision', 'Status']:
+                        worksheet.set_column(col_num, col_num, 11)
+
+                # Set row height to 69 pixels (approximately 51 points)
+                worksheet.set_default_row(19)
+
+                # Apply the cell format to each cell in the data
+                for row_num in range(len(dataframe)):
+
+                    # Loop through each column for the current row
+                    for col_num, column_name in enumerate(dataframe.columns):
+                        cell_value = dataframe.iloc[row_num, col_num]
+                        if pd.isna(cell_value):
+                            cell_value = None  # Handle NaN and NaT
+
+                        # Determine the base format
+                        base_format = cell_format
+                        if column_name == 'Revision Date':
+                            base_format = date_format
+
+                        # Write the cell with the determined format
+                        worksheet.write(row_num + 1, col_num, cell_value, base_format)
+
+            # Write each DataFrame to its respective sheet and apply formatti
+            for dataframe, sheet_name in dataframes_with_sheet_names:
+                # Write the DataFrame data to XlsxWriter
+                dataframe.to_excel(writer, sheet_name=sheet_name, index=False)
+                # Apply formatting to each worksheet
+                format_worksheet(writer.sheets[sheet_name], dataframe)
+                (max_row, max_col) = dataframe.shape
+                writer.sheets[sheet_name].autofilter(0, 0, max_row, max_col - 1)
+                writer.sheets[sheet_name].freeze_panes(1, 0)
 
     def format_sheet_2_final_export(self, writer, dataframes_with_sheet_names):
         df1, sheet_name1 = dataframes_with_sheet_names[0]
@@ -685,30 +806,32 @@ class Excel_Manipulation():
             'align': 'center',
             'border': 1})
 
-        worksheet.merge_range('C25:F25', 'Class of Change', merged_format)
         # Function to write a DataFrame to a specified starting row
         def write_dataframe(worksheet, dataframe, start_row):
             # Write the headers
             for col_num, value in enumerate(dataframe.columns.values):
                 worksheet.write(start_row, col_num, value, header_format)
 
-            if value in ['Discipline']:
-                worksheet.set_column(col_num, col_num, 52)  
-            elif value in ['SQ Count']:
-                worksheet.set_column(col_num, col_num, 10)
-            elif value in ['Field Redline', 'Incorporated in Design', 'Not Incorporated in Design', 'Partially Incorporated in Design']:
-                worksheet.set_column(col_num, col_num, 27)
+                if value in ['Discipline']:
+                    worksheet.set_column(col_num, col_num, 52)  
+                elif value in ['SQ Count']:
+                    worksheet.set_column(col_num, col_num, 10)
+                elif value in ['Field Redline', 'Incorporated in Design', 'Not Incorporated in Design', 'Partially Incorporated in Design']:
+                    worksheet.set_column(col_num, col_num, 27)
             
             # Write the data
             for row_num, row in enumerate(dataframe.values, start=start_row + 1):
                 for col_num, cell in enumerate(row):
-                    worksheet.write(row_num, col_num, cell, cell_format)  # Add formatting as needed
+                    worksheet.write(row_num, col_num, cell, cell_format)  
 
         # Write the first DataFrame
         write_dataframe(worksheet, df1, 0)  # Starting from row 0
 
         # Calculate the starting row for the second DataFrame (df1's rows + 2 for spacing)
-        start_row_df2 = len(df1) + 2  # +2 for spacing
+        start_row_df2 = len(df1) + 3  
+        row_merge_num = len(df1) + 3
+        row_merge = f"C{row_merge_num}:F{row_merge_num}"
+        worksheet.merge_range(row_merge, 'Class of Change', merged_format)
 
         # Write the second DataFrame
         write_dataframe(worksheet, df2, start_row_df2)
@@ -813,9 +936,6 @@ class Excel_Manipulation():
 
         # Days until next Friday (4 represents Friday)
         days_until_next_friday = (4 - today_weekday) % 7
-        if days_until_next_friday == 0:
-            # If today is Friday, we want next Friday, not today
-            days_until_next_friday = 7
 
         # Next Friday's date
         next_friday = today + timedelta(days=days_until_next_friday)
